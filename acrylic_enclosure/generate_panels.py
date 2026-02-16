@@ -23,7 +23,8 @@ import os
 # PARAMETERS
 # ============================================================
 
-T_WALL = 3.0        # outer panel acrylic thickness
+T_WALL = 3.0        # front/back/top panel acrylic thickness
+T_SIDE = 5.0        # left/right side and bottom panel acrylic thickness
 T_BRACKET = 5.0     # drive bracket / comb rail acrylic thickness
 KERF = 0.1          # laser kerf half-width
 
@@ -76,10 +77,11 @@ COMB_TOOTH_W = 20.0    # tooth width (X direction) — wide enough for M3 holes 
 SCREW_HEAD_CLR = 4.0   # clearance between comb face and front/back panel for screw heads
 
 # Assembly
-SIDE_OVERLAP = 3.0 + T_WALL          # 3mm overhang + 3mm slot = 6mm
+SIDE_OVERLAP = 3.0 + T_SIDE          # 3mm overhang + 5mm slot = 8mm
 
 # Finger joints
 FINGER_WIDTH = 12.0
+MIN_OVERHANG = 3.0   # material between slot and panel edge
 
 # ============================================================
 # DERIVED DIMENSIONS
@@ -95,11 +97,11 @@ INTERIOR_Y = max(2 * SCREW_HEAD_CLR + 2 * T_BRACKET + HDD_W, PI5_W + 20)
 INTERIOR_X = math.ceil(INTERIOR_X / 5) * 5
 INTERIOR_Y = math.ceil(INTERIOR_Y / 5) * 5
 
-EXT_X = INTERIOR_X + 2 * T_WALL
-EXT_Y = INTERIOR_Y + 2 * T_WALL
+EXT_X = INTERIOR_X + 2 * T_SIDE      # side panels are 5mm
+EXT_Y = INTERIOR_Y + 2 * T_WALL      # front/back panels are 3mm
 
 # Z-stack (from bottom of enclosure)
-Z_BOT_TOP = T_WALL
+Z_BOT_TOP = T_SIDE                                    # bottom panel is 5mm
 Z_PI5_PCB = Z_BOT_TOP + PI5_STANDOFF_H
 Z_PI5_TOP = Z_PI5_PCB + PI5_ENVELOPE_H           # top of USB connectors
 Z_HAT_PCB = Z_PI5_TOP + PI5_TO_HAT_GAP           # bottom of HAT PCB
@@ -111,6 +113,7 @@ Z_DRIVE_TOP = Z_DRIVE_BOT + HDD_L
 FAN_GAP = 10.0          # gap between drive tops and fan bracket for airflow
 Z_FAN_BRACKET = Z_DRIVE_TOP + FAN_GAP           # bottom of fan bracket
 Z_FAN_TOP = Z_FAN_BRACKET + T_WALL + FAN_DEPTH  # top of fan (bracket=3mm + fan=25mm)
+# Note: top panel is T_WALL=3mm
 Z_TOP_PANEL = Z_FAN_TOP + 5                     # 5mm clearance above fan to top panel
 TOTAL_H = Z_TOP_PANEL + T_WALL
 
@@ -122,7 +125,7 @@ COMB_BAR_Z = Z_DRIVE_TOP - COMB_BAR_H  # bar bottom edge = Z_DRIVE_TOP - 12mm
 COMB_TOOTH_LEN = HDD_L - COMB_BAR_H - 10  # tooth hangs below bar, leave 10mm at bottom
 COMB_TOTAL_H = COMB_BAR_H + COMB_TOOTH_LEN
 
-ROD_INSET = T_WALL + 2 * ROD_DIA  # rod hole inset from panel edge
+ROD_INSET = T_SIDE + 2 * ROD_DIA  # rod hole inset from panel edge (past 5mm side panel)
 
 print(f"Interior: {INTERIOR_X} x {INTERIOR_Y} mm")
 print(f"Exterior: {EXT_X:.1f} x {EXT_Y:.1f} mm")
@@ -216,13 +219,17 @@ class SVG:
 # FINGER JOINT OUTLINE BUILDER
 # ============================================================
 
-def finger_outline(w, h, top='flat', bottom='flat', left='flat', right='flat', depth=T_WALL, skip_lr_ends=False):
+def finger_outline(w, h, top='flat', bottom='flat', left='flat', right='flat', depth=T_WALL, lr_depth=None, skip_lr_ends=False):
     """
     Build a closed polygon for a rectangular panel with optional finger joints.
     Each edge: 'tab' = fingers protrude outward, 'slot' = notches cut inward, 'flat' = straight.
     Traversal: clockwise starting from top-left.
     """
-    def edge_pts(length, n, mode, axis, start, perp, direction, inward, skip_ends=False):
+    if lr_depth is None:
+        lr_depth = depth
+
+    def edge_pts(length, n, mode, axis, start, perp, direction, inward, skip_ends=False, edge_depth=None):
+        d0 = edge_depth if edge_depth is not None else depth
         pts = []
         fw = length / n
         for i in range(n):
@@ -240,7 +247,7 @@ def finger_outline(w, h, top='flat', bottom='flat', left='flat', right='flat', d
                     pts.append((perp, start + direction * s))
             elif (mode in ('tab', 'outer_tab', 'slot') and is_finger):
                 # tab: edge recedes inward; slot/outer_tab: edge protrudes outward
-                d = -depth if mode == 'tab' else depth
+                d = -d0 if mode == 'tab' else d0
                 if axis == 'x':
                     pts.append((start + direction * s, perp))
                     pts.append((start + direction * s, perp + inward * d))
@@ -274,11 +281,11 @@ def finger_outline(w, h, top='flat', bottom='flat', left='flat', right='flat', d
     # Top edge: left to right, y=0
     pts.extend(edge_pts(w, nfingers(w), top, 'x', 0, 0, 1, -1, skip_ends=skip_tb))
     # Right edge: top to bottom, x=w
-    pts.extend(edge_pts(h, nfingers(h), right, 'y', 0, w, 1, 1, skip_ends=skip_lr_ends))
+    pts.extend(edge_pts(h, nfingers(h), right, 'y', 0, w, 1, 1, skip_ends=skip_lr_ends, edge_depth=lr_depth))
     # Bottom edge: right to left, y=h
     pts.extend(edge_pts(w, nfingers(w), bottom, 'x', w, h, -1, 1, skip_ends=skip_tb))
     # Left edge: bottom to top, x=0
-    pts.extend(edge_pts(h, nfingers(h), left, 'y', h, 0, -1, -1, skip_ends=skip_lr_ends))
+    pts.extend(edge_pts(h, nfingers(h), left, 'y', h, 0, -1, -1, skip_ends=skip_lr_ends, edge_depth=lr_depth))
 
     # Remove consecutive duplicate points
     clean = [pts[0]]
@@ -306,12 +313,12 @@ def add_rod_holes(svg, pw, ph, inset=ROD_INSET):
 
 def tb_panel_outline(w, h):
     """
-    Custom outline for top/bottom panels (w=EXT_X, h=EXT_Y+2*T_WALL).
+    Custom outline for top/bottom panels (w=EXT_X, h=EXT_Y+2*T_SIDE).
     - Top/bottom edges: finger protrusions spanning EXT_X (mate with front/back panel notches).
     - Left/right edges: straight (through-slots added separately as rects).
     """
     pts = []
-    depth = T_WALL
+    depth = T_WALL  # protrusions mate with 3mm front/back panels
 
     # --- Finger parameters for top/bottom edges (front/back mating) ---
     n_fb = max(3, round(w / FINGER_WIDTH))
@@ -370,14 +377,12 @@ def add_tb_side_slots(svg, w, h):
     if n_lr % 2 == 0:
         n_lr += 1
     fw_lr = EXT_Y / n_lr
-    slot_w = T_WALL  # slot width = side panel thickness
-    min_overhang = 3.0  # material between slot and panel edge
-
+    slot_w = T_SIDE  # slot width = side panel thickness (5mm)
     for edge_side in ['left', 'right']:
         if edge_side == 'left':
-            slot_x = min_overhang
+            slot_x = MIN_OVERHANG
         else:
-            slot_x = w - min_overhang - slot_w
+            slot_x = w - MIN_OVERHANG - slot_w
         for i in range(n_lr):
             if i % 2 == 0:  # tabs are at even indices on side panels
                 slot_y = T_WALL + i * fw_lr
@@ -390,9 +395,9 @@ def add_tb_side_slots(svg, w, h):
 
 def gen_bottom():
     w = EXT_X
-    h = EXT_Y + 2 * T_WALL  # extend 3mm past side panels on each side
-    s = SVG(w, h, "01_bottom_panel.svg", margin=T_WALL + 3)
-    s.text(0, -3, f"BOTTOM PANEL {w:.0f}x{h:.0f}mm (3mm)")
+    h = EXT_Y + 2 * T_WALL  # extend 3mm past front/back panels on each side
+    s = SVG(w, h, "01_bottom_panel.svg", margin=T_SIDE + 3)
+    s.text(0, -3, f"BOTTOM PANEL {w:.0f}x{h:.0f}mm (5mm)")
 
     # Custom outline: finger protrusions on top/bottom (front/back mating), straight left/right.
     outline = tb_panel_outline(w, h)
@@ -407,10 +412,10 @@ def gen_bottom():
     # Pi5 mounting holes — USB-A/RJ45 end near left side panel
     # Pi5 long edge (85mm) runs along X (left-right),
     # short edge (56mm) runs along Y (front-to-back).
-    # Port edge inset from left: side panel inner face (2*T_WALL=6mm) + 2mm connector overhang.
+    # Port edge inset from left: side panel inner face (min_overhang + T_SIDE) + 2mm connector overhang.
     pi_w_on_panel = PI5_L   # 85mm along X (left-right)
     pi_h_on_panel = PI5_W   # 56mm along Y (front-to-back)
-    pi_ox = 2 * T_WALL + 2             # port edge: past side panel inner face (6mm) + 2mm connector overhang
+    pi_ox = MIN_OVERHANG + T_SIDE + 2  # port edge: past side panel inner face + 2mm connector overhang
     pi_oy = (h - pi_h_on_panel) / 2   # centered front-to-back
     # Mounting holes: Pi5 native coords have origin at GPIO corner.
     # Native X runs along 85mm (long edge), native Y along 56mm (short edge).
@@ -425,27 +430,62 @@ def gen_bottom():
         hy = ny                  # native Y -> panel Y
         s.circle(pi_ox + hx, pi_oy + hy, PI5_HOLE_DIA / 2)
 
-    # Ventilation slots under Pi area (centered under Pi5 footprint)
-    vent_slot_w, vent_slot_h = 18, 2.5
-    n_vent_cols = 3
-    n_vent_rows = 2
-    vent_x_margin = (pi_w_on_panel - n_vent_cols * vent_slot_w) / (n_vent_cols + 1)
-    vent_y_margin = (pi_h_on_panel - n_vent_rows * vent_slot_h) / (n_vent_rows + 1)
-    for col in range(n_vent_cols):
-        vx = pi_ox + vent_x_margin + col * (vent_slot_w + vent_x_margin)
-        for row in range(n_vent_rows):
-            vy = pi_oy + vent_y_margin + row * (vent_slot_h + vent_y_margin)
-            s.slot(vx, vy, vent_slot_w, vent_slot_h)
+    # Dense ventilation grid across entire bottom panel for bottom-to-top airflow.
+    # Avoid: side panel slots (near left/right edges), rod holes (corners),
+    #        Pi5 mounting holes, and SD card access hole.
+    vent_slot_w, vent_slot_h = 22, 3.0
+    vent_margin_x = MIN_OVERHANG + T_SIDE + 5  # clear of side panel slots + margin
+    vent_margin_y = T_WALL + 8                  # clear of front/back panel edge + margin
+    vent_x0 = vent_margin_x
+    vent_x1 = w - vent_margin_x
+    vent_y0 = vent_margin_y
+    vent_y1 = h - vent_margin_y
+    vent_pitch_x = vent_slot_w + 5   # 5mm material between slots
+    vent_pitch_y = vent_slot_h + 5   # 5mm material between slots
+    n_cols = int((vent_x1 - vent_x0) / vent_pitch_x)
+    n_rows = int((vent_y1 - vent_y0) / vent_pitch_y)
+    # Center the grid
+    grid_w = n_cols * vent_pitch_x - 5
+    grid_h = n_rows * vent_pitch_y - 5
+    vx_start = vent_x0 + (vent_x1 - vent_x0 - grid_w) / 2
+    vy_start = vent_y0 + (vent_y1 - vent_y0 - grid_h) / 2
 
-    # SD card access hole — SD slot is on the right edge (X- in STEP = high panel X).
-    # Slot spans native Y ~22–34mm along the 56mm short edge (from STEP Z coords).
-    # After rotation: slot at panel Y offsets 22–34, at the right edge of Pi5 footprint.
+    # Collect exclusion zones: Pi5 mounting holes (with margin), SD card hole
+    pi_holes = []
+    for nx, ny in [(PI5_HOLE_OFFSET_X, PI5_HOLE_OFFSET_Y),
+                   (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y),
+                   (PI5_HOLE_OFFSET_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y),
+                   (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y)]:
+        hx = pi_ox + PI5_L - nx
+        hy = pi_oy + ny
+        pi_holes.append((hx, hy))
+
+    # SD card access hole dimensions (computed early for exclusion zone)
     sd_slot_y0 = 22.05   # offset from pi_oy along 56mm edge
     sd_slot_y1 = 34.0
     sd_w = 20.0     # extends past PCB edge for finger reach
     sd_h = 14.0     # slightly wider than 12mm slot for finger access
     sd_x = pi_ox + pi_w_on_panel - sd_w / 4   # skewed past right edge for finger access
     sd_y = pi_oy + sd_slot_y0 + (sd_slot_y1 - sd_slot_y0 - sd_h) / 2  # centered on slot
+
+    def overlaps_exclusion(vx, vy):
+        for hx, hy in pi_holes:
+            if vx < hx + 4 and vx + vent_slot_w > hx - 4 and vy < hy + 4 and vy + vent_slot_h > hy - 4:
+                return True
+        # Also exclude vents that overlap the SD card access hole (with 2mm margin)
+        if (vx < sd_x + sd_w + 2 and vx + vent_slot_w > sd_x - 2 and
+                vy < sd_y + sd_h + 2 and vy + vent_slot_h > sd_y - 2):
+            return True
+        return False
+
+    for col in range(n_cols):
+        vx = vx_start + col * vent_pitch_x
+        for row in range(n_rows):
+            vy = vy_start + row * vent_pitch_y
+            if not overlaps_exclusion(vx, vy):
+                s.slot(vx, vy, vent_slot_w, vent_slot_h)
+
+    # SD card access hole (dimensions computed above for exclusion zone)
     s.rrect(sd_x, sd_y, sd_w, sd_h, r=3)
     s.text(sd_x, sd_y - 1.5, "SD card", size=2)
 
@@ -462,7 +502,7 @@ def gen_bottom():
 
 def gen_top():
     w = EXT_X
-    h = EXT_Y + 2 * T_WALL  # extend 3mm past side panels on each side
+    h = EXT_Y + 2 * T_WALL  # extend 3mm past front/back panels on each side
     s = SVG(w, h, "02_top_panel.svg", margin=T_WALL + 3)
     s.text(0, -3, f"TOP PANEL {w:.0f}x{h:.0f}mm (3mm)")
 
@@ -500,10 +540,11 @@ def gen_front():
     s = SVG(w, h, "03_front_panel.svg", margin=T_WALL + 3)
     s.text(0, -3, f"FRONT PANEL {w:.0f}x{h:.1f}mm (3mm)")
 
-    # tab on top/bottom = notches to receive top/bottom panel protrusions.
-    # outer_tab on left/right = tabs protruding outward into side panel through-slots.
+    # tab on top/bottom = notches to receive top/bottom panel protrusions (T_WALL deep).
+    # outer_tab on left/right = tabs protruding outward into side panel through-slots (T_SIDE deep).
     # skip_lr_ends: omit first/last tabs — no matching slots at side panel corners.
-    outline = finger_outline(w, h, top='tab', bottom='tab', left='outer_tab', right='outer_tab', skip_lr_ends=True)
+    outline = finger_outline(w, h, top='tab', bottom='tab', left='outer_tab', right='outer_tab',
+                             depth=T_WALL, lr_depth=T_SIDE, skip_lr_ends=True)
     s.path(outline)
 
     # No rod holes — vertical rods pass through top/bottom panels only
@@ -552,10 +593,11 @@ def gen_back():
     s = SVG(w, h, "04_back_panel.svg", margin=T_WALL + 3)
     s.text(0, -3, f"BACK PANEL {w:.0f}x{h:.1f}mm (3mm)")
 
-    # tab on top/bottom = notches to receive top/bottom panel protrusions.
-    # outer_tab on left/right = tabs protruding outward into side panel through-slots.
+    # tab on top/bottom = notches to receive top/bottom panel protrusions (T_WALL deep).
+    # outer_tab on left/right = tabs protruding outward into side panel through-slots (T_SIDE deep).
     # skip_lr_ends: omit first/last tabs — no matching slots at side panel corners.
-    outline = finger_outline(w, h, top='tab', bottom='tab', left='outer_tab', right='outer_tab', skip_lr_ends=True)
+    outline = finger_outline(w, h, top='tab', bottom='tab', left='outer_tab', right='outer_tab',
+                             depth=T_WALL, lr_depth=T_SIDE, skip_lr_ends=True)
     s.path(outline)
 
     # No rod holes — vertical rods pass through top/bottom panels only
@@ -566,7 +608,7 @@ def gen_back():
 
     # Pi5 is rotated: long edge (85mm) runs left-right, ports face left side panel.
     # Score line showing Pi5 PCB position (85mm wide, near left edge)
-    pi_x = T_WALL  # Pi5 port edge flush with left side panel interior
+    pi_x = T_SIDE  # Pi5 port edge near left side panel interior
     pi_z_y = z_to_y(Z_PI5_PCB + 1.45)  # top of PCB (1.45mm thick from STEP)
     s.rect(pi_x, pi_z_y, PI5_L, 1.45, style="engrave")
     s.text(pi_x, pi_z_y - 1.5, "Pi5 (ports on left side)", size=2)
@@ -587,8 +629,8 @@ def gen_side(side='left'):
     w = EXT_Y + 2 * SIDE_OVERLAP  # wider to wrap around front/back
     h = SIDE_H
     idx = "05" if side == 'left' else "06"
-    s = SVG(w, h, f"{idx}_{side}_side_panel.svg", margin=T_WALL + 3)
-    s.text(0, -3, f"{side.upper()} SIDE {w:.1f}x{h:.1f}mm (3mm)")
+    s = SVG(w, h, f"{idx}_{side}_side_panel.svg", margin=T_SIDE + 3)
+    s.text(0, -3, f"{side.upper()} SIDE {w:.1f}x{h:.1f}mm (5mm)")
 
     # Custom outline: top/bottom edges have tabs in the central EXT_Y region
     # (mating with top/bottom panel slots), with flat SIDE_OVERLAP wings on each end.
@@ -668,15 +710,14 @@ def gen_side(side='left'):
     if n_fingers % 2 == 0:
         n_fingers += 1
     fw = fb_h / n_fingers
-    tab_depth = T_WALL  # 3mm tab protrusion — no extra clearance, laser kerf provides it
+    tab_depth = T_WALL  # front/back panels are 3mm, so through-slots are 3mm wide
     slot_w = tab_depth
-    min_overhang = 3.0  # minimum material between slot edge and panel edge
     for edge_side in ['left', 'right']:
-        # Place slot so outer edge is exactly min_overhang from the panel edge
+        # Place slot so outer edge is exactly MIN_OVERHANG from the panel edge
         if edge_side == 'left':
-            slot_x = min_overhang
+            slot_x = MIN_OVERHANG
         else:
-            slot_x = w - min_overhang - slot_w
+            slot_x = w - MIN_OVERHANG - slot_w
         for i in range(n_fingers):
             if i % 2 == 0:  # tabs are at even indices on front/back panels
                 # Skip first and last finger — too close to top/bottom edges
@@ -696,7 +737,7 @@ def gen_side(side='left'):
         # Pi5 is centered front-to-back in enclosure.
         # Bottom panel pi_oy = (EXT_Y + 2*T_WALL - PI5_W) / 2
         # Interior Y of Pi5 front edge = pi_oy - T_WALL
-        pi_interior_y = (EXT_Y + 2 * T_WALL - PI5_W) / 2 - T_WALL  # = 35mm
+        pi_interior_y = (EXT_Y + 2 * T_WALL - PI5_W) / 2 - T_WALL
         # Side panel X = SIDE_OVERLAP + interior_Y
         pi_x = SIDE_OVERLAP + pi_interior_y  # Pi5 start on side panel X axis
         pi_pcb_y = z_to_y(Z_PI5_PCB)  # PCB bottom in panel Y coords
@@ -719,7 +760,7 @@ def gen_side(side='left'):
 
         # DC barrel jack — 8mm hole, positioned 15mm toward front from Pi5 ports
         dc_x = pi_x - 15
-        dc_y = z_to_y(T_WALL + 15)
+        dc_y = z_to_y(T_SIDE + 15)  # 15mm above bottom panel top (5mm)
         s.circle(dc_x, dc_y, 4.0)
         s.text(dc_x + 6, dc_y + 1, "DC 12V", size=2)
 
