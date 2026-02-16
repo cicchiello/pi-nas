@@ -3,45 +3,6 @@
 <!-- Red=cut, Blue=score/engrave. All dims in mm. -->
   <text x="6" y="3" font-size="3" fill="#999" font-family="monospace">BACK PANEL 191x333.2mm (3mm)</text>
   <path d="M 6,6 L 17.235,6 L 28.471,6 L 28.471,9 L 39.706,9 L 39.706,6 L 50.941,6 L 50.941,9 L 62.176,9 L 62.176,6 L 73.412,6 L 73.412,9 L 84.647,9 L 84.647,6 L 95.882,6 L 95.882,9 L 107.118,9 L 107.118,6 L 118.353,6 L 118.353,9 L 129.588,9 L 129.588,6 L 140.824,6 L 140.824,9 L 152.059,9 L 152.059,6 L 163.294,6 L 163.294,9 L 174.529,9 L 174.529,6 L 185.765,6 L 197,6 L 197,17.491 L 197,28.982 L 200,28.982 L 200,40.473 L 197,40.473 L 197,51.964 L 200,51.964 L 200,63.455 L 197,63.455 L 197,74.946 L 200,74.946 L 200,86.437 L 197,86.437 L 197,97.928 L 200,97.928 L 200,109.419 L 197,109.419 L 197,120.91 L 200,120.91 L 200,132.401 L 197,132.401 L 197,143.892 L 200,143.892 L 200,155.383 L 197,155.383 L 197,166.874 L 200,166.874 L 200,178.366 L 197,178.366 L 197,189.857 L 200,189.857 L 200,201.348 L 197,201.348 L 197,212.839 L 200,212.839 L 200,224.33 L 197,224.33 L 197,235.821 L 200,235.821 L 200,247.312 L 197,247.312 L 197,258.803 L 200,258.803 L 200,270.294 L 197,270.294 L 197,281.785 L 200,281.785 L 200,293.276 L 197,293.276 L 197,304.767 L 200,304.767 L 200,316.258 L 197,316.258 L 197,327.749 L 197,339.24 L 185.765,339.24 L 174.529,339.24 L 174.529,336.24 L 163.294,336.24 L 163.294,339.24 L 152.059,339.24 L 152.059,336.24 L 140.824,336.24 L 140.824,339.24 L 129.588,339.24 L 129.588,336.24 L 118.353,336.24 L 118.353,339.24 L 107.118,339.24 L 107.118,336.24 L 95.882,336.24 L 95.882,339.24 L 84.647,339.24 L 84.647,336.24 L 73.412,336.24 L 73.412,339.24 L 62.176,339.24 L 62.176,336.24 L 50.941,336.24 L 50.941,339.24 L 39.706,339.24 L 39.706,336.24 L 28.471,336.24 L 28.471,339.24 L 17.235,339.24 L 6,339.24 L 6,327.749 L 6,316.258 L 3,316.258 L 3,304.767 L 6,304.767 L 6,293.276 L 3,293.276 L 3,281.785 L 6,281.785 L 6,270.294 L 3,270.294 L 3,258.803 L 6,258.803 L 6,247.312 L 3,247.312 L 3,235.821 L 6,235.821 L 6,224.33 L 3,224.33 L 3,212.839 L 6,212.839 L 6,201.348 L 3,201.348 L 3,189.857 L 6,189.857 L 6,178.366 L 3,178.366 L 3,166.874 L 6,166.874 L 6,155.383 L 3,155.383 L 3,143.892 L 6,143.892 L 6,132.401 L 3,132.401 L 3,120.91 L 6,120.91 L 6,109.419 L 3,109.419 L 3,97.928 L 6,97.928 L 6,86.437 L 3,86.437 L 3,74.946 L 6,74.946 L 6,63.455 L 3,63.455 L 3,51.964 L 6,51.964 L 6,40.473 L 3,40.473 L 3,28.982 L 6,28.982 L 6,17.491 L 6,6 Z" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="73.5" y="327.79" width="56" height="1.45" fill="none" stroke="#0000ff" stroke-width="0.1"/>
-  <text x="73.5" y="326.29" font-size="2" fill="#999" font-family="monospace">Pi5 (no port access this side)</text>
-  <rect x="26" y="280.99" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="280.99" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="280.99" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="262.24" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="262.24" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="262.24" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="243.49" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="243.49" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="243.49" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="224.74" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="224.74" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="224.74" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="205.99" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="205.99" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="205.99" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="180.99" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="180.99" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="180.99" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="163.563" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="163.563" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="163.563" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="146.136" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="146.136" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="146.136" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="128.709" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="128.709" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="128.709" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="111.281" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="111.281" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="111.281" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="93.854" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="93.854" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="93.854" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="76.427" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="76.427" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="76.427" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="26" y="59" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="90.5" y="59" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <rect x="155" y="59" width="22" height="2.5" rx="1.25" ry="1.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <rect x="9" y="327.79" width="85" height="1.45" fill="none" stroke="#0000ff" stroke-width="0.1"/>
+  <text x="9" y="326.29" font-size="2" fill="#999" font-family="monospace">Pi5 (ports on left side)</text>
 </svg>

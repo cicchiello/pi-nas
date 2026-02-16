@@ -404,49 +404,54 @@ def gen_bottom():
     # Corner rod holes — vertical rods through top+bottom only
     add_rod_holes(s, w, h)
 
-    # Pi5 mounting holes — USB-A/RJ45 end flush with front panel
-    # The Pi5's USB-A and RJ45 Ethernet ports are on the SHORT edge (56mm).
-    # Rotate Pi5 so short edge (56mm) runs along X (left-right),
-    # long edge (85mm) runs along Y (front-to-back).
-    # Port edge at Y = T_WALL (front panel interior face).
-    pi_w_on_panel = PI5_W   # 56mm along X (left-right)
-    pi_h_on_panel = PI5_L   # 85mm along Y (front-to-back)
-    pi_ox = (w - pi_w_on_panel) / 2   # centered left-to-right
-    pi_oy = T_WALL                     # port edge flush with front panel interior
+    # Pi5 mounting holes — USB-A/RJ45 end near left side panel
+    # Pi5 long edge (85mm) runs along X (left-right),
+    # short edge (56mm) runs along Y (front-to-back).
+    # Port edge inset from left: side panel inner face (2*T_WALL=6mm) + 2mm connector overhang.
+    pi_w_on_panel = PI5_L   # 85mm along X (left-right)
+    pi_h_on_panel = PI5_W   # 56mm along Y (front-to-back)
+    pi_ox = 2 * T_WALL + 2             # port edge: past side panel inner face (6mm) + 2mm connector overhang
+    pi_oy = (h - pi_h_on_panel) / 2   # centered front-to-back
     # Mounting holes: Pi5 native coords have origin at GPIO corner.
     # Native X runs along 85mm (long edge), native Y along 56mm (short edge).
-    # After 90° rotation with USB/Eth end at front:
-    #   panel_x_offset = native_y  (short edge maps to panel X)
-    #   panel_y_offset = PI5_L - native_x  (long edge reversed: USB end X=85 -> Y=0=front)
+    # After rotation with USB/Eth end at left:
+    #   panel_x_offset = PI5_L - native_x  (long edge reversed: USB end X=85 -> panel X=0=left)
+    #   panel_y_offset = native_y  (short edge maps to panel Y)
     for nx, ny in [(PI5_HOLE_OFFSET_X, PI5_HOLE_OFFSET_Y),
                    (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y),
                    (PI5_HOLE_OFFSET_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y),
                    (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y)]:
-        hx = ny                  # native Y -> panel X
-        hy = PI5_L - nx          # native X -> panel Y (reversed)
+        hx = PI5_L - nx          # native X -> panel X (reversed)
+        hy = ny                  # native Y -> panel Y
         s.circle(pi_ox + hx, pi_oy + hy, PI5_HOLE_DIA / 2)
 
-    # Ventilation slots under Pi area
-    for row in range(3):
-        vy = pi_oy + 15 + row * 25
-        for col in range(2):
-            vx = pi_ox + 8 + col * 28
-            s.slot(vx, vy, 18, 2.5)
+    # Ventilation slots under Pi area (centered under Pi5 footprint)
+    vent_slot_w, vent_slot_h = 18, 2.5
+    n_vent_cols = 3
+    n_vent_rows = 2
+    vent_x_margin = (pi_w_on_panel - n_vent_cols * vent_slot_w) / (n_vent_cols + 1)
+    vent_y_margin = (pi_h_on_panel - n_vent_rows * vent_slot_h) / (n_vent_rows + 1)
+    for col in range(n_vent_cols):
+        vx = pi_ox + vent_x_margin + col * (vent_slot_w + vent_x_margin)
+        for row in range(n_vent_rows):
+            vy = pi_oy + vent_y_margin + row * (vent_slot_h + vent_y_margin)
+            s.slot(vx, vy, vent_slot_w, vent_slot_h)
 
-    # SD card access hole — SD slot is on the back edge (X- in STEP = high Y on panel).
-    # Slot spans ~22–34mm along the 56mm short edge (from STEP Z coords).
-    # Rounded rect straddling the Pi5 back edge for finger access.
-    sd_cx = 22.05   # offset from pi_ox along 56mm edge
-    sd_w = 14.0     # slightly wider than 12mm slot for finger access
-    sd_h = 20.0     # extends past PCB edge for finger reach
-    sd_x = pi_ox + sd_cx + (34.0 - 22.05 - sd_w) / 2  # centered on slot
-    sd_y = pi_oy + pi_h_on_panel - sd_h / 4            # skewed past back edge for finger access
+    # SD card access hole — SD slot is on the right edge (X- in STEP = high panel X).
+    # Slot spans native Y ~22–34mm along the 56mm short edge (from STEP Z coords).
+    # After rotation: slot at panel Y offsets 22–34, at the right edge of Pi5 footprint.
+    sd_slot_y0 = 22.05   # offset from pi_oy along 56mm edge
+    sd_slot_y1 = 34.0
+    sd_w = 20.0     # extends past PCB edge for finger reach
+    sd_h = 14.0     # slightly wider than 12mm slot for finger access
+    sd_x = pi_ox + pi_w_on_panel - sd_w / 4   # skewed past right edge for finger access
+    sd_y = pi_oy + sd_slot_y0 + (sd_slot_y1 - sd_slot_y0 - sd_h) / 2  # centered on slot
     s.rrect(sd_x, sd_y, sd_w, sd_h, r=3)
     s.text(sd_x, sd_y - 1.5, "SD card", size=2)
 
     # Score: Pi5 outline (rotated)
     s.rect(pi_ox, pi_oy, pi_w_on_panel, pi_h_on_panel, style="engrave")
-    s.text(pi_ox + 2, pi_oy + 10, "Pi5 (USB-A/RJ45 end at front)", size=3)
+    s.text(pi_ox + 2, pi_oy + 10, "Pi5 (USB-A/RJ45 end at left)", size=3)
 
     s.save()
 
@@ -507,44 +512,33 @@ def gen_front():
     def z_to_y(z_enc):
         return Z_TOP_PANEL - z_enc
 
-    # Pi5 port cutouts (dimensions from STEP file, confirmed by user)
-    # Pi5 is rotated: short edge (56mm, USB-A/RJ45) faces this panel.
-    # Front panel SVG X is mirrored vs bottom panel X (viewed from outside).
-    # Facing the front panel from outside, left-to-right: GbE, USB3, USB2.
-    pi_x = (w - PI5_W) / 2   # Pi5 short edge (56mm) centered in X
-    pi_pcb_y = z_to_y(Z_PI5_PCB)  # PCB bottom in panel Y coords
-
-    # Port positions along the 56mm short edge (from STEP model).
-    # (name, x_offset_from_pi_left, z_offset_from_pcb_bottom, width, height)
-    # z_offset: height of connector housing bottom above PCB bottom.
-    #   Ethernet is flush with PCB top (1.45mm above PCB bottom).
-    #   USB stacks are elevated ~1mm above PCB top (2.45mm above PCB bottom).
-    # Includes ~1mm clearance margin per side.
-    # Order left-to-right on front panel: GbE | USB 3.0 | USB 2.0
-    ports = [
-        ("GbE",   1.25,   0.45, 17.9, 15.5),   # RJ45 Ethernet (flush with PCB top = 1.45 above PCB bot)
-        ("USB3", 21.30,   1.45, 15.6, 16.6),   # Stacked USB 3.0 pair (~1mm above PCB top = 2.45 above PCB bot)
-        ("USB2", 39.10,   1.45, 15.8, 16.6),   # Stacked USB 2.0 pair (~1mm above PCB top = 2.45 above PCB bot)
-        ("HAT",  35.10,  22.05, 19.8,  6.1),   # Penta SATA HAT connector (4mm above USB2 top, right-aligned with USB2)
-    ]
-    for name, px, pz, pw, ph in ports:
-        cx = pi_x + px
-        # pz is height of cutout bottom above PCB bottom, ph extends upward
-        # In panel coords: cutout top = pi_pcb_y - (pz + ph)
-        cy = pi_pcb_y - pz - ph
-        s.rrect(cx, cy, pw, ph, r=1.5)
-        s.text(cx, cy - 1.5, name, size=2)
-
-    # DC barrel jack — 8mm hole (7.85mm threaded OD), centered 30mm left of Pi5, 15mm above bottom panel top
-    dc_x = pi_x - 30
-    dc_y = z_to_y(T_WALL + 15)
-    s.circle(dc_x, dc_y, 4.0)
-    s.text(dc_x + 6, dc_y + 1, "DC 12V", size=2)
+    # Pi5 port cutouts and DC barrel jack moved to left side panel (Pi5 rotated: ports face left)
 
     # Score line showing drive zone start
     dz_y = z_to_y(Z_DRIVE_BOT)
     s.rect(10, dz_y - 0.15, w - 20, 0.3, style="engrave")
     s.text(2, dz_y + 3, f"drive zone", size=2)
+
+    # Ventilation: cable zone
+    vx_start, vx_end = 20, w - 20
+    slot_w, slot_h = 22, 2.5
+    cable_z0 = Z_HAT_TOP + 15
+    cable_z1 = Z_DRIVE_BOT - 10
+    if cable_z1 > cable_z0:
+        for i in range(5):
+            vz = cable_z0 + i * (cable_z1 - cable_z0) / 4
+            for j in range(3):
+                vx = vx_start + j * (vx_end - vx_start - slot_w) / 2
+                s.slot(vx, z_to_y(vz), slot_w, slot_h)
+
+    # Ventilation: drive zone
+    dz0 = Z_DRIVE_BOT + 15
+    dz1 = Z_DRIVE_TOP - 10
+    for i in range(8):
+        vz = dz0 + i * (dz1 - dz0) / 7
+        for j in range(3):
+            vx = vx_start + j * (vx_end - vx_start - slot_w) / 2
+            s.slot(vx, z_to_y(vz), slot_w, slot_h)
 
     s.save()
 
@@ -570,35 +564,16 @@ def gen_back():
     def z_to_y(z_enc):
         return Z_TOP_PANEL - z_enc
 
-    # Pi5 HDMI/USB-C/Audio ports — NOT cut out (user doesn't need access)
-    # Pi5 is rotated: long edge (85mm) runs front-to-back (Y on back panel = enclosure X)
-    pi_x = (w - PI5_W) / 2  # 56mm short edge centered in X
+    # Pi5 is rotated: long edge (85mm) runs left-right, ports face left side panel.
+    # Score line showing Pi5 PCB position (85mm wide, near left edge)
+    pi_x = T_WALL  # Pi5 port edge flush with left side panel interior
     pi_z_y = z_to_y(Z_PI5_PCB + 1.45)  # top of PCB (1.45mm thick from STEP)
-    s.rect(pi_x, pi_z_y, PI5_W, 1.45, style="engrave")
-    s.text(pi_x, pi_z_y - 1.5, "Pi5 (no port access this side)", size=2)
+    s.rect(pi_x, pi_z_y, PI5_L, 1.45, style="engrave")
+    s.text(pi_x, pi_z_y - 1.5, "Pi5 (ports on left side)", size=2)
 
     # DC barrel jack — moved to front panel
 
-    # Ventilation: cable zone
-    vx_start, vx_end = 20, w - 20
-    slot_w, slot_h = 22, 2.5
-    cable_z0 = Z_HAT_TOP + 15
-    cable_z1 = Z_DRIVE_BOT - 10
-    if cable_z1 > cable_z0:
-        for i in range(5):
-            vz = cable_z0 + i * (cable_z1 - cable_z0) / 4
-            for j in range(3):
-                vx = vx_start + j * (vx_end - vx_start - slot_w) / 2
-                s.slot(vx, z_to_y(vz), slot_w, slot_h)
-
-    # Ventilation: drive zone
-    dz0 = Z_DRIVE_BOT + 15
-    dz1 = Z_DRIVE_TOP - 10
-    for i in range(8):
-        vz = dz0 + i * (dz1 - dz0) / 7
-        for j in range(3):
-            vx = vx_start + j * (vx_end - vx_start - slot_w) / 2
-            s.slot(vx, z_to_y(vz), slot_w, slot_h)
+    # Ventilation slots moved to front panel
 
     s.save()
 
@@ -716,6 +691,38 @@ def gen_side(side='left'):
     def z_to_y(z_enc):
         return Z_TOP_PANEL - z_enc
 
+    # Pi5 port cutouts — only on left side panel (ports face left)
+    if side == 'left':
+        # Pi5 is centered front-to-back in enclosure.
+        # Bottom panel pi_oy = (EXT_Y + 2*T_WALL - PI5_W) / 2
+        # Interior Y of Pi5 front edge = pi_oy - T_WALL
+        pi_interior_y = (EXT_Y + 2 * T_WALL - PI5_W) / 2 - T_WALL  # = 35mm
+        # Side panel X = SIDE_OVERLAP + interior_Y
+        pi_x = SIDE_OVERLAP + pi_interior_y  # Pi5 start on side panel X axis
+        pi_pcb_y = z_to_y(Z_PI5_PCB)  # PCB bottom in panel Y coords
+
+        # Port positions along the 56mm short edge (from STEP model).
+        # (name, x_offset_from_pi_left, z_offset_from_pcb_bottom, width, height)
+        # Facing the left side panel from outside, left = front, right = back.
+        # native_Y=0 (GbE end) is at pi_x, native_Y=56 at pi_x + PI5_W.
+        ports = [
+            ("GbE",   1.25,   0.45, 17.9, 15.5),
+            ("USB3", 21.30,   1.45, 15.6, 16.6),
+            ("USB2", 39.10,   1.45, 15.8, 16.6),
+            ("HAT",  35.10,  22.05, 19.8,  6.1),
+        ]
+        for name, px, pz, pw, ph in ports:
+            cx = pi_x + px
+            cy = pi_pcb_y - pz - ph
+            s.rrect(cx, cy, pw, ph, r=1.5)
+            s.text(cx, cy - 1.5, name, size=2)
+
+        # DC barrel jack — 8mm hole, positioned 15mm toward front from Pi5 ports
+        dc_x = pi_x - 15
+        dc_y = z_to_y(T_WALL + 15)
+        s.circle(dc_x, dc_y, 4.0)
+        s.text(dc_x + 6, dc_y + 1, "DC 12V", size=2)
+
     # Comb rail mounting slots — two rails (front + back of drives)
     # X on side panel = SIDE_OVERLAP + (enclosure Y position - T_WALL)
     rail_front_y = T_WALL + SCREW_HEAD_CLR + T_BRACKET / 2
@@ -730,26 +737,31 @@ def gen_side(side='left'):
         slot_y = bar_center_y - tab_slot_h / 2
         s.rect(slot_x, slot_y, tab_slot_w, tab_slot_h)
 
-    # Ventilation: cable zone
-    slot_w, slot_h = 18, 2.5
-    vy_start, vy_end = 15, w - 15
+    # Ventilation slots — 3 columns placed between the comb rail bracket slots
+    slot_w_v, slot_h_v = 18, 2.5
+    # Bracket exclusion zones are near x=8–15 and x=117–124.
+    # Place 3 vent columns in the clear zone between brackets.
+    bracket_front_x = SIDE_OVERLAP + (rail_front_y - T_WALL) + tab_slot_w / 2 + 2
+    bracket_back_x = SIDE_OVERLAP + (rail_back_y - T_WALL) - tab_slot_w / 2 - 2
+    vent_zone_w = bracket_back_x - bracket_front_x - slot_w_v
+    vent_cols = [bracket_front_x + j * vent_zone_w / 2 for j in range(3)]
+
+    # Cable zone
     cable_z0 = Z_HAT_TOP + 15
     cable_z1 = Z_DRIVE_BOT - 10
     if cable_z1 > cable_z0:
         for i in range(4):
             vz = cable_z0 + i * (cable_z1 - cable_z0) / 3
-            for j in range(2):
-                vy = vy_start + j * (vy_end - vy_start - slot_w)
-                s.slot(vy, z_to_y(vz), slot_w, slot_h)
+            for vx in vent_cols:
+                s.slot(vx, z_to_y(vz), slot_w_v, slot_h_v)
 
-    # Ventilation: drive zone
+    # Drive zone
     dz0 = Z_DRIVE_BOT + 20
     dz1 = Z_DRIVE_TOP - 10
     for i in range(6):
         vz = dz0 + i * (dz1 - dz0) / 5
-        for j in range(2):
-            vy = vy_start + j * (vy_end - vy_start - slot_w)
-            s.slot(vy, z_to_y(vz), slot_w, slot_h)
+        for vx in vent_cols:
+            s.slot(vx, z_to_y(vz), slot_w_v, slot_h_v)
 
     s.save()
 
