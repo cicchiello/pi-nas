@@ -232,6 +232,7 @@ def finger_outline(w, h, top='flat', bottom='flat', left='flat', right='flat', d
             # If skip_ends, treat first and last finger positions as flat
             if skip_ends and is_finger and (i == 0 or i == n - 1):
                 is_finger = False
+            is_last = (i == n - 1)
             if mode == 'flat':
                 if axis == 'x':
                     pts.append((start + direction * s, perp))
@@ -265,13 +266,17 @@ def finger_outline(w, h, top='flat', bottom='flat', left='flat', right='flat', d
             n += 1
         return n
 
+    # Skip first/last fingers on top/bottom edges when adjacent left/right edges
+    # have finger joints, to avoid stray notch-wall segments at corners.
+    skip_tb = (left != 'flat' or right != 'flat')
+
     pts = []
     # Top edge: left to right, y=0
-    pts.extend(edge_pts(w, nfingers(w), top, 'x', 0, 0, 1, -1))
+    pts.extend(edge_pts(w, nfingers(w), top, 'x', 0, 0, 1, -1, skip_ends=skip_tb))
     # Right edge: top to bottom, x=w
     pts.extend(edge_pts(h, nfingers(h), right, 'y', 0, w, 1, 1, skip_ends=skip_lr_ends))
     # Bottom edge: right to left, y=h
-    pts.extend(edge_pts(w, nfingers(w), bottom, 'x', w, h, -1, 1))
+    pts.extend(edge_pts(w, nfingers(w), bottom, 'x', w, h, -1, 1, skip_ends=skip_tb))
     # Left edge: bottom to top, x=0
     pts.extend(edge_pts(h, nfingers(h), left, 'y', h, 0, -1, -1, skip_ends=skip_lr_ends))
 
@@ -428,6 +433,17 @@ def gen_bottom():
             vx = pi_ox + 8 + col * 28
             s.slot(vx, vy, 18, 2.5)
 
+    # SD card access hole — SD slot is on the back edge (X- in STEP = high Y on panel).
+    # Slot spans ~22–34mm along the 56mm short edge (from STEP Z coords).
+    # Rounded rect straddling the Pi5 back edge for finger access.
+    sd_cx = 22.05   # offset from pi_ox along 56mm edge
+    sd_w = 14.0     # slightly wider than 12mm slot for finger access
+    sd_h = 20.0     # extends past PCB edge for finger reach
+    sd_x = pi_ox + sd_cx + (34.0 - 22.05 - sd_w) / 2  # centered on slot
+    sd_y = pi_oy + pi_h_on_panel - sd_h / 4            # skewed past back edge for finger access
+    s.rrect(sd_x, sd_y, sd_w, sd_h, r=3)
+    s.text(sd_x, sd_y - 1.5, "SD card", size=2)
+
     # Score: Pi5 outline (rotated)
     s.rect(pi_ox, pi_oy, pi_w_on_panel, pi_h_on_panel, style="engrave")
     s.text(pi_ox + 2, pi_oy + 10, "Pi5 (USB-A/RJ45 end at front)", size=3)
@@ -507,8 +523,9 @@ def gen_front():
     # Order left-to-right on front panel: GbE | USB 3.0 | USB 2.0
     ports = [
         ("GbE",   1.25,   0.45, 17.9, 15.5),   # RJ45 Ethernet (flush with PCB top = 1.45 above PCB bot)
-        ("USB3", 21.30,   1.45, 15.6, 17.2),   # Stacked USB 3.0 pair (~1mm above PCB top = 2.45 above PCB bot)
+        ("USB3", 21.30,   1.45, 15.6, 16.6),   # Stacked USB 3.0 pair (~1mm above PCB top = 2.45 above PCB bot)
         ("USB2", 39.10,   1.45, 15.8, 16.6),   # Stacked USB 2.0 pair (~1mm above PCB top = 2.45 above PCB bot)
+        ("HAT",  35.10,  22.05, 19.8,  6.1),   # Penta SATA HAT connector (4mm above USB2 top, right-aligned with USB2)
     ]
     for name, px, pz, pw, ph in ports:
         cx = pi_x + px
@@ -517,6 +534,12 @@ def gen_front():
         cy = pi_pcb_y - pz - ph
         s.rrect(cx, cy, pw, ph, r=1.5)
         s.text(cx, cy - 1.5, name, size=2)
+
+    # DC barrel jack — 8mm hole (7.85mm threaded OD), centered 30mm left of Pi5, 15mm above bottom panel top
+    dc_x = pi_x - 30
+    dc_y = z_to_y(T_WALL + 15)
+    s.circle(dc_x, dc_y, 4.0)
+    s.text(dc_x + 6, dc_y + 1, "DC 12V", size=2)
 
     # Score line showing drive zone start
     dz_y = z_to_y(Z_DRIVE_BOT)
@@ -554,9 +577,7 @@ def gen_back():
     s.rect(pi_x, pi_z_y, PI5_W, 1.45, style="engrave")
     s.text(pi_x, pi_z_y - 1.5, "Pi5 (no port access this side)", size=2)
 
-    # DC barrel jack — 12mm panel-mount hole
-    s.circle(w / 2, z_to_y(Z_HAT_TOP - 5), 6.0)
-    s.text(w / 2 + 8, z_to_y(Z_HAT_TOP - 5) + 1, "DC 12V (5.5x2.5)", size=2)
+    # DC barrel jack — moved to front panel
 
     # Ventilation: cable zone
     vx_start, vx_end = 20, w - 20
