@@ -33,8 +33,8 @@ ROD_HOLE = 4.5      # clearance hole
 GROMMET_OD = 10.0   # rubber grommet outer diameter
 
 # Raspberry Pi 5
-PI5_L = 85.0         # long edge (USB/Ethernet ports on this edge)
-PI5_W = 56.0         # short edge
+PI5_L = 85.0         # long edge (USB-C, HDMI, audio on this edge)
+PI5_W = 56.0         # short edge (USB-A, RJ45 Ethernet on this edge)
 PI5_HOLE_SPACING_X = 58.0
 PI5_HOLE_SPACING_Y = 49.0
 PI5_HOLE_DIA = 2.7   # M2.5 clearance
@@ -66,7 +66,7 @@ DRIVE_GAP = 20.0       # 20mm face-to-face between adjacent drives for laminar a
 DRIVE_EDGE_MARGIN = 10.0  # 10mm from outer drive face to side wall
 CABLE_ZONE_H = 100.0   # 10cm for SATA cables
 PI5_STANDOFF_H = 7.0   # M2.5 standoff under Pi5 (clears ~2mm bottom protrusion)
-PI5_ENVELOPE_H = 17.2  # Pi5 PCB bottom to top of USB connector (from STEP)
+PI5_ENVELOPE_H = 18.0  # Pi5 PCB bottom to top of tallest connector (RJ45, from STEP)
 PI5_TO_HAT_GAP = 3.0   # gap from Pi5 USB top to HAT PCB bottom (GPIO seated)
 HAT_ENVELOPE_H = 12.25 # HAT PCB bottom to top of tallest connector (from STEP)
 
@@ -114,7 +114,7 @@ Z_FAN_TOP = Z_FAN_BRACKET + T_WALL + FAN_DEPTH  # top of fan (bracket=3mm + fan=
 Z_TOP_PANEL = Z_FAN_TOP + 5                     # 5mm clearance above fan to top panel
 TOTAL_H = Z_TOP_PANEL + T_WALL
 
-SIDE_H = Z_TOP_PANEL - T_WALL  # interior height = side panel height
+SIDE_H = Z_TOP_PANEL  # front/back/side panel height (Z=0 to Z=Z_TOP_PANEL)
 
 # Comb rail: bar top edge at Z_DRIVE_TOP, bar extends downward, teeth below that
 # This keeps the bar within the drive zone, leaving fan zone clear above.
@@ -399,8 +399,8 @@ def gen_bottom():
     # Corner rod holes — vertical rods through top+bottom only
     add_rod_holes(s, w, h)
 
-    # Pi5 mounting holes — USB/Ethernet end flush with front panel
-    # The Pi5's USB/Ethernet ports are on the SHORT edge (56mm).
+    # Pi5 mounting holes — USB-A/RJ45 end flush with front panel
+    # The Pi5's USB-A and RJ45 Ethernet ports are on the SHORT edge (56mm).
     # Rotate Pi5 so short edge (56mm) runs along X (left-right),
     # long edge (85mm) runs along Y (front-to-back).
     # Port edge at Y = T_WALL (front panel interior face).
@@ -408,13 +408,17 @@ def gen_bottom():
     pi_h_on_panel = PI5_L   # 85mm along Y (front-to-back)
     pi_ox = (w - pi_w_on_panel) / 2   # centered left-to-right
     pi_oy = T_WALL                     # port edge flush with front panel interior
-    # Mounting holes: after 90° rotation, X/Y swap.
-    # Original hole offsets are from the GPIO-header corner.
-    # After rotation: hole_x -> hole_y, hole_y -> hole_x (mirrored)
-    for hx, hy in [(PI5_HOLE_OFFSET_Y, PI5_HOLE_OFFSET_X),
-                   (PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y, PI5_HOLE_OFFSET_X),
-                   (PI5_HOLE_OFFSET_Y, PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X),
-                   (PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y, PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X)]:
+    # Mounting holes: Pi5 native coords have origin at GPIO corner.
+    # Native X runs along 85mm (long edge), native Y along 56mm (short edge).
+    # After 90° rotation with USB/Eth end at front:
+    #   panel_x_offset = native_y  (short edge maps to panel X)
+    #   panel_y_offset = PI5_L - native_x  (long edge reversed: USB end X=85 -> Y=0=front)
+    for nx, ny in [(PI5_HOLE_OFFSET_X, PI5_HOLE_OFFSET_Y),
+                   (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y),
+                   (PI5_HOLE_OFFSET_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y),
+                   (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y)]:
+        hx = ny                  # native Y -> panel X
+        hy = PI5_L - nx          # native X -> panel Y (reversed)
         s.circle(pi_ox + hx, pi_oy + hy, PI5_HOLE_DIA / 2)
 
     # Ventilation slots under Pi area
@@ -426,7 +430,7 @@ def gen_bottom():
 
     # Score: Pi5 outline (rotated)
     s.rect(pi_ox, pi_oy, pi_w_on_panel, pi_h_on_panel, style="engrave")
-    s.text(pi_ox + 2, pi_oy + 10, "Pi5 (USB/Eth end at front)", size=3)
+    s.text(pi_ox + 2, pi_oy + 10, "Pi5 (USB-A/RJ45 end at front)", size=3)
 
     s.save()
 
@@ -483,29 +487,33 @@ def gen_front():
 
     # No rod holes — vertical rods pass through top/bottom panels only
 
-    # Panel Y axis: Y=0 = top of enclosure, Y=SIDE_H = bottom
+    # Panel Y axis: Y=0 = top (Z=Z_TOP_PANEL), Y=SIDE_H = bottom (Z=0)
     def z_to_y(z_enc):
         return Z_TOP_PANEL - z_enc
 
-    # Pi5 port cutouts
-    # Pi5 is rotated: short edge (56mm, USB/Ethernet) faces this panel.
+    # Pi5 port cutouts (dimensions from STEP file, confirmed by user)
+    # Pi5 is rotated: short edge (56mm, USB-A/RJ45) faces this panel.
+    # Front panel SVG X is mirrored vs bottom panel X (viewed from outside).
+    # Facing the front panel from outside, left-to-right: GbE, USB3, USB2.
     pi_x = (w - PI5_W) / 2   # Pi5 short edge (56mm) centered in X
-    # Pi5 PCB bottom is at Z_PI5_PCB. Ports extend ~2.5mm below PCB.
-    # Port tops are at about Z_PI5_PCB + 16mm (stacked USB height)
     pi_pcb_y = z_to_y(Z_PI5_PCB)  # PCB bottom in panel Y coords
 
-    # Port positions along the 56mm short edge (USB/Ethernet side):
-    # (name, x_from_pi_left, z_offset_from_pcb_bottom, width, height)
-    # z_offset is positive upward in enclosure, but on panel Y goes downward
+    # Port positions along the 56mm short edge (from STEP model).
+    # (name, x_offset_from_pi_left, z_offset_from_pcb_bottom, width, height)
+    # z_offset: height of connector housing bottom above PCB bottom.
+    #   Ethernet is flush with PCB top (1.45mm above PCB bottom).
+    #   USB stacks are elevated ~1mm above PCB top (2.45mm above PCB bottom).
+    # Includes ~1mm clearance margin per side.
+    # Order left-to-right on front panel: GbE | USB 3.0 | USB 2.0
     ports = [
-        ("GbE",     2.0,  -2.5, 16.0, 14.0),   # RJ45 Ethernet
-        ("USB",    22.0,  -2.5, 14.5, 16.0),    # Stacked USB 2.0+3.0 pair
-        ("USB",    40.0,  -2.5, 14.5, 16.0),    # Second USB stack
+        ("GbE",   1.25,   0.45, 17.9, 15.5),   # RJ45 Ethernet (flush with PCB top = 1.45 above PCB bot)
+        ("USB3", 21.30,   1.45, 15.6, 17.2),   # Stacked USB 3.0 pair (~1mm above PCB top = 2.45 above PCB bot)
+        ("USB2", 39.10,   1.45, 15.8, 16.6),   # Stacked USB 2.0 pair (~1mm above PCB top = 2.45 above PCB bot)
     ]
     for name, px, pz, pw, ph in ports:
         cx = pi_x + px
-        # pz is offset below PCB bottom (negative = below), ph extends upward
-        # In panel coords: top of port = pi_pcb_y - (pz + ph), bottom = pi_pcb_y - pz
+        # pz is height of cutout bottom above PCB bottom, ph extends upward
+        # In panel coords: cutout top = pi_pcb_y - (pz + ph)
         cy = pi_pcb_y - pz - ph
         s.rrect(cx, cy, pw, ph, r=1.5)
         s.text(cx, cy - 1.5, name, size=2)
@@ -535,15 +543,15 @@ def gen_back():
 
     # No rod holes — vertical rods pass through top/bottom panels only
 
-    # Panel Y axis: Y=0 = top of enclosure, Y=SIDE_H = bottom
+    # Panel Y axis: Y=0 = top (Z=Z_TOP_PANEL), Y=SIDE_H = bottom (Z=0)
     def z_to_y(z_enc):
         return Z_TOP_PANEL - z_enc
 
     # Pi5 HDMI/USB-C/Audio ports — NOT cut out (user doesn't need access)
     # Pi5 is rotated: long edge (85mm) runs front-to-back (Y on back panel = enclosure X)
     pi_x = (w - PI5_W) / 2  # 56mm short edge centered in X
-    pi_z_y = z_to_y(Z_PI5_PCB + 1.6)  # top of PCB
-    s.rect(pi_x, pi_z_y, PI5_W, 1.6, style="engrave")
+    pi_z_y = z_to_y(Z_PI5_PCB + 1.45)  # top of PCB (1.45mm thick from STEP)
+    s.rect(pi_x, pi_z_y, PI5_W, 1.45, style="engrave")
     s.text(pi_x, pi_z_y - 1.5, "Pi5 (no port access this side)", size=2)
 
     # DC barrel jack — 12mm panel-mount hole
@@ -682,7 +690,7 @@ def gen_side(side='left'):
                 slot_y = i * fw
                 s.rect(slot_x, slot_y, slot_w, fw)
 
-    # Side panel Y axis: Y=0 = top of enclosure (Z=Z_TOP_PANEL), Y=SIDE_H = bottom (Z=T_WALL)
+    # Side panel Y axis: Y=0 = top (Z=Z_TOP_PANEL), Y=SIDE_H = bottom (Z=0)
     # To convert enclosure Z to side panel Y: panel_y = Z_TOP_PANEL - enclosure_z
     def z_to_y(z_enc):
         return Z_TOP_PANEL - z_enc
