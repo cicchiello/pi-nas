@@ -77,7 +77,7 @@ COMB_TOOTH_W = 20.0    # tooth width (X direction) — wide enough for M3 holes 
 SCREW_HEAD_CLR = 4.0   # clearance between comb face and front/back panel for screw heads
 
 # Assembly
-SIDE_OVERLAP = 3.0 + T_SIDE          # 3mm overhang + 5mm slot = 8mm
+SIDE_OVERLAP = 3.0 + T_WALL           # 3mm overhang + 3mm slot (front/back panel thickness)
 
 # Finger joints
 FINGER_WIDTH = 12.0
@@ -98,7 +98,7 @@ INTERIOR_X = math.ceil(INTERIOR_X / 5) * 5
 INTERIOR_Y = math.ceil(INTERIOR_Y / 5) * 5
 
 EXT_X = INTERIOR_X + 2 * T_SIDE      # side panels are 5mm
-EXT_Y = INTERIOR_Y + 2 * T_WALL      # front/back panels are 3mm
+EXT_Y = INTERIOR_Y + 2 * T_WALL                   # front/back panels are 3mm
 
 # Z-stack (from bottom of enclosure)
 Z_BOT_TOP = T_SIDE                                    # bottom panel is 5mm
@@ -117,7 +117,7 @@ Z_FAN_TOP = Z_FAN_BRACKET + T_WALL + FAN_DEPTH  # top of fan (bracket=3mm + fan=
 Z_TOP_PANEL = Z_FAN_TOP + 5                     # 5mm clearance above fan to top panel
 TOTAL_H = Z_TOP_PANEL + T_WALL
 
-SIDE_H = Z_TOP_PANEL  # front/back/side panel height (Z=0 to Z=Z_TOP_PANEL)
+SIDE_H = Z_TOP_PANEL - T_SIDE  # front/back/side panel height (Z=T_SIDE to Z=Z_TOP_PANEL)
 
 # Comb rail: bar top edge at Z_DRIVE_TOP, bar extends downward, teeth below that
 # This keeps the bar within the drive zone, leaving fan zone clear above.
@@ -219,53 +219,27 @@ class SVG:
 # FINGER JOINT OUTLINE BUILDER
 # ============================================================
 
-def finger_outline(w, h, top='flat', bottom='flat', left='flat', right='flat', depth=T_WALL, lr_depth=None, skip_lr_ends=False):
+def finger_outline(w, h, top='flat', bottom='flat', left='flat', right='flat',
+                   depth=T_WALL, lr_depth=None, bot_depth=None, top_depth=None,
+                   skip_lr_ends=False):
     """
     Build a closed polygon for a rectangular panel with optional finger joints.
-    Each edge: 'tab' = fingers protrude outward, 'slot' = notches cut inward, 'flat' = straight.
+    Each edge: 'tab' = notches recede inward, 'outer_tab' = protrudes outward
+    (into mating panel slot), 'flat' = straight.
     Traversal: clockwise starting from top-left.
+
+    depth: default depth (used as fallback).
+    top_depth: depth for top edge (defaults to depth).
+    bot_depth: depth for bottom edge (defaults to depth).
+    lr_depth: depth for left/right edges (defaults to depth).
+    skip_lr_ends: skip first/last fingers on left/right edges.
     """
     if lr_depth is None:
         lr_depth = depth
-
-    def edge_pts(length, n, mode, axis, start, perp, direction, inward, skip_ends=False, edge_depth=None):
-        d0 = edge_depth if edge_depth is not None else depth
-        pts = []
-        fw = length / n
-        for i in range(n):
-            s = i * fw
-            e = (i + 1) * fw
-            is_finger = (i % 2 == 0)
-            # If skip_ends, treat first and last finger positions as flat
-            if skip_ends and is_finger and (i == 0 or i == n - 1):
-                is_finger = False
-            is_last = (i == n - 1)
-            if mode == 'flat':
-                if axis == 'x':
-                    pts.append((start + direction * s, perp))
-                else:
-                    pts.append((perp, start + direction * s))
-            elif (mode in ('tab', 'outer_tab', 'slot') and is_finger):
-                # tab: edge recedes inward; slot/outer_tab: edge protrudes outward
-                d = -d0 if mode == 'tab' else d0
-                if axis == 'x':
-                    pts.append((start + direction * s, perp))
-                    pts.append((start + direction * s, perp + inward * d))
-                    pts.append((start + direction * e, perp + inward * d))
-                    pts.append((start + direction * e, perp))
-                else:
-                    pts.append((perp, start + direction * s))
-                    pts.append((perp + inward * d, start + direction * s))
-                    pts.append((perp + inward * d, start + direction * e))
-                    pts.append((perp, start + direction * e))
-            else:
-                if axis == 'x':
-                    pts.append((start + direction * s, perp))
-                    pts.append((start + direction * e, perp))
-                else:
-                    pts.append((perp, start + direction * s))
-                    pts.append((perp, start + direction * e))
-        return pts
+    if bot_depth is None:
+        bot_depth = depth
+    if top_depth is None:
+        top_depth = depth
 
     def nfingers(length):
         n = max(3, round(length / FINGER_WIDTH))
@@ -273,25 +247,159 @@ def finger_outline(w, h, top='flat', bottom='flat', left='flat', right='flat', d
             n += 1
         return n
 
-    # Skip first/last fingers on top/bottom edges when adjacent left/right edges
-    # have finger joints, to avoid stray notch-wall segments at corners.
-    skip_tb = (left != 'flat' or right != 'flat')
+    n_w = nfingers(w)
+    n_h = nfingers(h)
+    fw_w = w / n_w
+    fw_h = h / n_h
 
+    def signed_depth(mode, d0):
+        """Return signed depth: negative for tab (recedes inward), positive for outer_tab."""
+        if mode in ('tab',):
+            return -d0
+        elif mode in ('outer_tab', 'slot'):
+            return d0
+        return 0
+
+    def is_finger(i, n, mode, skip_ends):
+        """Is position i a finger (not flat)?"""
+        if mode == 'flat':
+            return False
+        if i % 2 != 0:
+            return False
+        if skip_ends and (i == 0 or i == n - 1):
+            return False
+        return True
+
+    # Build the outline as one continuous clockwise path.
+    # At each corner, the depth of the ending finger on one edge determines
+    # where the next edge starts — no backtracking.
     pts = []
-    # Top edge: left to right, y=0
-    pts.extend(edge_pts(w, nfingers(w), top, 'x', 0, 0, 1, -1, skip_ends=skip_tb))
-    # Right edge: top to bottom, x=w
-    pts.extend(edge_pts(h, nfingers(h), right, 'y', 0, w, 1, 1, skip_ends=skip_lr_ends, edge_depth=lr_depth))
-    # Bottom edge: right to left, y=h
-    pts.extend(edge_pts(w, nfingers(w), bottom, 'x', w, h, -1, 1, skip_ends=skip_tb))
-    # Left edge: bottom to top, x=0
-    pts.extend(edge_pts(h, nfingers(h), left, 'y', h, 0, -1, -1, skip_ends=skip_lr_ends, edge_depth=lr_depth))
+
+    # Determine corner depths: the depth at each corner is determined by
+    # whether the adjacent edge ends/starts with a finger.
+    # Corner order: TL(0,0), TR(w,0), BR(w,h), BL(0,h)
+    # Top edge ends at TR: last finger (i=n_w-1) — always even (n_w is odd)
+    # Negated because top edge inward is +y (opposite of signed_depth convention)
+    top_d = -signed_depth(top, top_depth) if is_finger(n_w - 1, n_w, top, False) else 0
+    # Bottom edge starts at BR: first finger (i=0)
+    bot_d_start = signed_depth(bottom, bot_depth) if is_finger(0, n_w, bottom, False) else 0
+    # Bottom edge ends at BL: last finger (i=n_w-1)
+    bot_d_end = signed_depth(bottom, bot_depth) if is_finger(n_w - 1, n_w, bottom, False) else 0
+    # Top edge starts at TL: first finger (i=0)
+    top_d_start = -signed_depth(top, top_depth) if is_finger(0, n_w, top, False) else 0
+
+    # --- Top edge: left to right, y=0 ---
+    # For the top edge, "inward" is +y (into the panel body).
+    # tab = notch inward (+y), outer_tab = protrusion outward (-y).
+    # This is opposite of signed_depth's convention, so we negate it.
+    for i in range(n_w):
+        x0 = i * fw_w
+        x1 = (i + 1) * fw_w
+        if is_finger(i, n_w, top, False):
+            d = -signed_depth(top, top_depth)
+            if i == 0:
+                # Start at notch depth (left edge will connect here)
+                pts.append((x0, d))
+            else:
+                pts.append((x0, 0))
+                pts.append((x0, d))
+            if i == n_w - 1:
+                # End at notch depth (right edge will connect from here)
+                pts.append((x1, d))
+            else:
+                pts.append((x1, d))
+                pts.append((x1, 0))
+        else:
+            if i == 0 and top_d_start != 0:
+                pass  # previous corner handles start
+            else:
+                pts.append((x0, 0))
+            pts.append((x1, 0))
+
+    # --- Right edge: top to bottom, x=w ---
+    # If top edge ends with a notch at TR corner, right edge starts at notch depth
+    right_start_y = top_d if top_d != 0 else 0
+    # If bottom edge starts with a notch at BR corner, right edge stops at notch depth
+    right_end_y = h + bot_d_start if bot_d_start != 0 else h
+    for i in range(n_h):
+        y0 = i * fw_h
+        y1 = (i + 1) * fw_h
+        if i == 0:
+            y0_actual = right_start_y  # adjust first segment to meet top edge notch
+        else:
+            y0_actual = y0
+        if i == n_h - 1:
+            y1_actual = right_end_y  # adjust last segment to meet bottom edge notch
+        else:
+            y1_actual = y1
+        if is_finger(i, n_h, right, skip_lr_ends):
+            d = signed_depth(right, lr_depth)
+            pts.append((w, y0_actual))
+            pts.append((w + d, y0_actual))
+            pts.append((w + d, y1_actual))
+            pts.append((w, y1_actual))
+        else:
+            pts.append((w, y0_actual))
+            pts.append((w, y1_actual))
+
+    # --- Bottom edge: right to left, y=h ---
+    for i in range(n_w):
+        # i=0 is at the right end (x=w), i=n_w-1 is at the left end (x=0)
+        x1 = w - i * fw_w       # start x (right side)
+        x0 = w - (i + 1) * fw_w  # end x (left side)
+        if is_finger(i, n_w, bottom, False):
+            d = signed_depth(bottom, bot_depth)
+            if i == 0:
+                # Right edge already ended at notch depth — start directly
+                pts.append((x1, h + d))
+            else:
+                pts.append((x1, h))
+                pts.append((x1, h + d))
+            if i == n_w - 1:
+                # End at notch depth — left edge will start from here
+                pts.append((x0, h + d))
+            else:
+                pts.append((x0, h + d))
+                pts.append((x0, h))
+        else:
+            pts.append((x1, h))
+            pts.append((x0, h))
+
+    # --- Left edge: bottom to top, x=0 ---
+    # If bottom edge ends with a notch at BL corner, left edge starts at notch depth
+    left_start_y = h + bot_d_end if bot_d_end != 0 else h
+    # If top edge starts with a notch at TL corner, left edge ends at notch depth
+    left_end_y = top_d_start if top_d_start != 0 else 0
+    for i in range(n_h):
+        # i=0 is at the bottom (y=h), i=n_h-1 is at the top (y=0)
+        y1 = h - i * fw_h       # start y (bottom)
+        y0 = h - (i + 1) * fw_h  # end y (top)
+        if i == 0:
+            y1_actual = left_start_y  # adjust first segment to meet bottom edge notch
+        else:
+            y1_actual = y1
+        if i == n_h - 1:
+            y0_actual = left_end_y  # adjust last segment to meet top edge notch
+        else:
+            y0_actual = y0
+        if is_finger(i, n_h, left, skip_lr_ends):
+            d = signed_depth(left, lr_depth)
+            pts.append((0, y1_actual))
+            pts.append((-d, y1_actual))
+            pts.append((-d, y0_actual))
+            pts.append((0, y0_actual))
+        else:
+            pts.append((0, y1_actual))
+            pts.append((0, y0_actual))
 
     # Remove consecutive duplicate points
     clean = [pts[0]]
     for p in pts[1:]:
         if abs(p[0] - clean[-1][0]) > 0.001 or abs(p[1] - clean[-1][1]) > 0.001:
             clean.append(p)
+    # Remove closing duplicate if first == last
+    if len(clean) > 1 and abs(clean[0][0] - clean[-1][0]) < 0.001 and abs(clean[0][1] - clean[-1][1]) < 0.001:
+        clean.pop()
     return clean
 
 
@@ -313,7 +421,7 @@ def add_rod_holes(svg, pw, ph, inset=ROD_INSET):
 
 def tb_panel_outline(w, h):
     """
-    Custom outline for top/bottom panels (w=EXT_X, h=EXT_Y+2*T_SIDE).
+    Custom outline for top/bottom panels (w=EXT_X, h=INTERIOR_Y).
     - Top/bottom edges: finger protrusions spanning EXT_X (mate with front/back panel notches).
     - Left/right edges: straight (through-slots added separately as rects).
     """
@@ -373,10 +481,10 @@ def add_tb_side_slots(svg, w, h):
     Add rectangular through-slots near the left/right edges of a top/bottom panel
     to receive the side panel tabs. Slot positions match the side panel tab positions.
     """
-    n_lr = max(3, round(EXT_Y / FINGER_WIDTH))
+    n_lr = max(3, round(INTERIOR_Y / FINGER_WIDTH))
     if n_lr % 2 == 0:
         n_lr += 1
-    fw_lr = EXT_Y / n_lr
+    fw_lr = INTERIOR_Y / n_lr
     slot_w = T_SIDE  # slot width = side panel thickness (5mm)
     for edge_side in ['left', 'right']:
         if edge_side == 'left':
@@ -385,7 +493,7 @@ def add_tb_side_slots(svg, w, h):
             slot_x = w - MIN_OVERHANG - slot_w
         for i in range(n_lr):
             if i % 2 == 0:  # tabs are at even indices on side panels
-                slot_y = T_WALL + i * fw_lr
+                slot_y = i * fw_lr  # Y=0 = front panel inner face
                 svg.rect(slot_x, slot_y, slot_w, fw_lr)
 
 
@@ -395,7 +503,7 @@ def add_tb_side_slots(svg, w, h):
 
 def gen_bottom():
     w = EXT_X
-    h = EXT_Y + 2 * T_WALL  # extend 3mm past front/back panels on each side
+    h = INTERIOR_Y  # body spans front panel inner face to back panel inner face
     s = SVG(w, h, "01_bottom_panel.svg", margin=T_SIDE + 3)
     s.text(0, -3, f"BOTTOM PANEL {w:.0f}x{h:.0f}mm (5mm)")
 
@@ -435,7 +543,7 @@ def gen_bottom():
     #        Pi5 mounting holes, and SD card access hole.
     vent_slot_w, vent_slot_h = 22, 3.0
     vent_margin_x = MIN_OVERHANG + T_SIDE + 5  # clear of side panel slots + margin
-    vent_margin_y = T_WALL + 8                  # clear of front/back panel edge + margin
+    vent_margin_y = 8                            # clear of front/back edge + margin
     vent_x0 = vent_margin_x
     vent_x1 = w - vent_margin_x
     vent_y0 = vent_margin_y
@@ -502,7 +610,7 @@ def gen_bottom():
 
 def gen_top():
     w = EXT_X
-    h = EXT_Y + 2 * T_WALL  # extend 3mm past front/back panels on each side
+    h = INTERIOR_Y  # body spans front panel inner face to back panel inner face
     s = SVG(w, h, "02_top_panel.svg", margin=T_WALL + 3)
     s.text(0, -3, f"TOP PANEL {w:.0f}x{h:.0f}mm (3mm)")
 
@@ -515,20 +623,198 @@ def gen_top():
 
     add_rod_holes(s, w, h)
 
-    # Fan opening — centered
-    cx, cy = w / 2, h / 2
-    s.circle(cx, cy, 37)  # 74mm opening
-
     # Fan mounts to internal bracket, not top panel — no screw holes here
 
-    # Finger guard — concentric vent rings
-    for r in [10, 18, 26, 34]:
-        n = max(6, int(2 * math.pi * r / 6))
-        for i in range(n):
-            a = 2 * math.pi * i / n
-            s.circle(cx + r * math.cos(a), cy + r * math.sin(a), 1.2)
+    # Fan grille — concentric rings of arc slots for maximum airflow + finger safety.
+    # Slot width 3mm, ring gap ~4mm, spoke gap ~3mm. All openings < 8mm (finger-safe).
+    cx, cy = w / 2, h / 2
+    fan_r = 37  # outer radius of grille (74mm diameter)
+    slot_w = 3.0  # radial width of each arc slot
+    ring_gap = 4.0  # radial material between rings
+    ring_pitch = slot_w + ring_gap  # 7mm center-to-center
+    spoke_gap = 3.0  # circumferential material between arc slots
+    rings = []
+    r = 6.0  # start radius (leave small hub in center)
+    while r + slot_w <= fan_r:
+        rings.append(r)
+        r += ring_pitch
+    for r_inner in rings:
+        r_mid = r_inner + slot_w / 2
+        circ = 2 * math.pi * r_mid
+        n_slots = max(4, int(circ / (slot_w * 3 + spoke_gap)))
+        arc_angle = (2 * math.pi - n_slots * (spoke_gap / r_mid)) / n_slots
+        for i in range(n_slots):
+            a_start = 2 * math.pi * i / n_slots + (spoke_gap / r_mid) / 2
+            # Approximate arc with short line segments
+            n_seg = max(4, int(arc_angle * r_mid / 2))
+            pts = []
+            for seg in range(n_seg + 1):
+                a = a_start + arc_angle * seg / n_seg
+                for r_off in [r_inner, r_inner + slot_w]:
+                    pts.append((cx + r_off * math.cos(a), cy + r_off * math.sin(a)))
+            # Build closed path: outer arc forward, inner arc backward
+            outer = []
+            inner = []
+            for seg in range(n_seg + 1):
+                a = a_start + arc_angle * seg / n_seg
+                outer.append((cx + (r_inner + slot_w) * math.cos(a),
+                              cy + (r_inner + slot_w) * math.sin(a)))
+                inner.append((cx + r_inner * math.cos(a),
+                              cy + r_inner * math.sin(a)))
+            path_pts = outer + list(reversed(inner))
+            path_pts.append(path_pts[0])  # close
+            s.path(path_pts)
 
     s.save()
+
+
+# ============================================================
+# HELPER: front/back panel outline
+# ============================================================
+
+def fb_panel_outline(h, top_depth=T_WALL, bot_depth=T_SIDE):
+    """
+    Custom outline for front/back panels.
+    Body width = INTERIOR_X (fits between side panel inner faces).
+    Left/right edges have outer_tabs (T_SIDE deep) that slide into side panel through-slots.
+    Top/bottom edges have notches matching the top/bottom panel protrusion pattern
+    (which spans EXT_X with finger count based on EXT_X). The notch pattern extends
+    into the outer_tab zones at the corners.
+    """
+    # Body width = distance between bottom panel slot inner edges.
+    # The side panel sits in a slot starting at MIN_OVERHANG from the bottom panel edge,
+    # so the inner face is at MIN_OVERHANG + T_SIDE from each edge.
+    body_w = EXT_X - 2 * (MIN_OVERHANG + T_SIDE)
+    tab_w = T_SIDE  # outer_tab extension on each side
+
+    # --- Finger parameters for top/bottom edges (must match tb_panel_outline) ---
+    n_tb = max(3, round(EXT_X / FINGER_WIDTH))
+    if n_tb % 2 == 0:
+        n_tb += 1
+    fw_tb = EXT_X / n_tb
+
+    # --- Finger parameters for left/right edges ---
+    # The L/R finger pattern is based on SIDE_H (the side panel height),
+    # NOT the extended panel height h.  The extra top_ext/bot_ext at each
+    # end are flat extensions; tabs stay at their original positions.
+    top_ext = T_WALL   # flat extension above finger zone (into 3mm top panel)
+    bot_ext = T_SIDE   # flat extension below finger zone (into 5mm bottom panel)
+    lr_span = h - top_ext - bot_ext  # = SIDE_H
+    n_lr = max(3, round(lr_span / FINGER_WIDTH))
+    if n_lr % 2 == 0:
+        n_lr += 1
+    fw_lr = lr_span / n_lr
+
+    pts = []
+
+    # Notch pattern offset: front/back panel x=0 aligns with bottom panel
+    # x = MIN_OVERHANG + T_SIDE (inner edge of side panel slot).
+    notch_offset = MIN_OVERHANG + T_SIDE
+
+    # --- Top edge: left to right, y=0 ---
+    # Notch pattern uses EXT_X finger spacing, offset so panel x=0 aligns
+    # with the bottom panel slot inner edge. Clipped to body width.
+    for i in range(n_tb):
+        px0 = i * fw_tb - notch_offset
+        px1 = (i + 1) * fw_tb - notch_offset
+        cpx0 = max(px0, 0)
+        cpx1 = min(px1, body_w)
+        if cpx1 <= cpx0:
+            continue
+        if i % 2 == 0:  # notch (inward = +y)
+            d = top_depth
+            if i == 0:
+                pts.append((cpx0, d))
+                pts.append((cpx1, d))
+                pts.append((cpx1, 0))
+            elif i == n_tb - 1:
+                pts.append((cpx0, 0))
+                pts.append((cpx0, d))
+                pts.append((cpx1, d))
+            else:
+                pts.append((cpx0, 0))
+                pts.append((cpx0, d))
+                pts.append((cpx1, d))
+                pts.append((cpx1, 0))
+        else:
+            pts.append((cpx0, 0))
+            pts.append((cpx1, 0))
+
+    # --- Right edge: top to bottom, x=body_w ---
+    # Top edge ended at (body_w, top_depth).
+    # Flat extension from top_depth down to top_ext, then finger zone, then
+    # flat extension from finger zone end down to h - bot_depth.
+    pts.append((body_w, top_ext))  # flat from top_depth to top_ext
+    for i in range(n_lr):
+        y0 = top_ext + i * fw_lr
+        y1 = top_ext + (i + 1) * fw_lr
+        if i % 2 == 0 and i != 0 and i != n_lr - 1:
+            # outer_tab
+            pts.append((body_w, y0))
+            pts.append((body_w + tab_w, y0))
+            pts.append((body_w + tab_w, y1))
+            pts.append((body_w, y1))
+        else:
+            pts.append((body_w, y0))
+            pts.append((body_w, y1))
+    # Flat extension from finger zone end to h - bot_depth
+    pts.append((body_w, h - bot_depth))
+
+    # --- Bottom edge: right to left, y=h ---
+    # Right edge ended at (body_w, h - bot_depth). Clipped to body width.
+    for i in range(n_tb - 1, -1, -1):
+        px0 = i * fw_tb - notch_offset
+        px1 = (i + 1) * fw_tb - notch_offset
+        cpx0 = max(px0, 0)
+        cpx1 = min(px1, body_w)
+        if cpx1 <= cpx0:
+            continue
+        if i % 2 == 0:  # notch (inward = -y)
+            d = bot_depth
+            if i == n_tb - 1:
+                pts.append((cpx0, h - d))
+                pts.append((cpx0, h))
+            elif i == 0:
+                pts.append((cpx1, h))
+                pts.append((cpx1, h - d))
+                pts.append((cpx0, h - d))
+            else:
+                pts.append((cpx1, h))
+                pts.append((cpx1, h - d))
+                pts.append((cpx0, h - d))
+                pts.append((cpx0, h))
+        else:
+            pts.append((cpx1, h))
+            pts.append((cpx0, h))
+
+    # --- Left edge: bottom to top, x=0 ---
+    # Bottom edge ended at (0, h - bot_depth).
+    # Flat extension from h - bot_depth up to finger zone bottom, then
+    # finger zone, then flat extension from finger zone top up to top_depth.
+    pts.append((0, top_ext + lr_span))  # flat from h-bot_depth to finger zone bottom
+    for i in range(n_lr - 1, -1, -1):
+        y0 = top_ext + i * fw_lr
+        y1 = top_ext + (i + 1) * fw_lr
+        if i % 2 == 0 and i != 0 and i != n_lr - 1:
+            # outer_tab
+            pts.append((0, y1))
+            pts.append((-tab_w, y1))
+            pts.append((-tab_w, y0))
+            pts.append((0, y0))
+        else:
+            pts.append((0, y1))
+            pts.append((0, y0))
+    # Flat extension from finger zone top up to top_depth (to close path)
+    pts.append((0, top_depth))
+
+    # Remove consecutive duplicate points
+    clean = [pts[0]]
+    for p in pts[1:]:
+        if abs(p[0] - clean[-1][0]) > 0.001 or abs(p[1] - clean[-1][1]) > 0.001:
+            clean.append(p)
+    if len(clean) > 1 and abs(clean[0][0] - clean[-1][0]) < 0.001 and abs(clean[0][1] - clean[-1][1]) < 0.001:
+        clean.pop()
+    return clean
 
 
 # ============================================================
@@ -536,22 +822,23 @@ def gen_top():
 # ============================================================
 
 def gen_front():
-    w, h = EXT_X, SIDE_H
-    s = SVG(w, h, "03_front_panel.svg", margin=T_WALL + 3)
+    w = EXT_X - 2 * (MIN_OVERHANG + T_SIDE)
+    h = SIDE_H + T_WALL + T_SIDE  # extend T_WALL into top, T_SIDE into bottom
+    s = SVG(w, h, "03_front_panel.svg", margin=T_SIDE + 3)
     s.text(0, -3, f"FRONT PANEL {w:.0f}x{h:.1f}mm (3mm)")
 
-    # tab on top/bottom = notches to receive top/bottom panel protrusions (T_WALL deep).
-    # outer_tab on left/right = tabs protruding outward into side panel through-slots (T_SIDE deep).
-    # skip_lr_ends: omit first/last tabs — no matching slots at side panel corners.
-    outline = finger_outline(w, h, top='tab', bottom='tab', left='outer_tab', right='outer_tab',
-                             depth=T_WALL, lr_depth=T_SIDE, skip_lr_ends=True)
+    # Custom outline: body width between slot inner edges, outer_tabs on L/R,
+    # top/bottom notches matching tb_panel protrusion pattern (EXT_X span).
+    outline = fb_panel_outline(h, top_depth=T_WALL, bot_depth=T_SIDE)
     s.path(outline)
 
     # No rod holes — vertical rods pass through top/bottom panels only
 
-    # Panel Y axis: Y=0 = top (Z=Z_TOP_PANEL), Y=SIDE_H = bottom (Z=0)
+    # Panel Y axis: Y=0 = top, Y=h = bottom.
+    # Panel extends T_SIDE above Z_TOP_PANEL and T_SIDE below T_SIDE.
+    # Y=T_SIDE corresponds to Z=Z_TOP_PANEL, Y=h-T_SIDE corresponds to Z=T_SIDE.
     def z_to_y(z_enc):
-        return Z_TOP_PANEL - z_enc
+        return (Z_TOP_PANEL - z_enc) + T_SIDE
 
     # Pi5 port cutouts and DC barrel jack moved to left side panel (Pi5 rotated: ports face left)
 
@@ -589,22 +876,22 @@ def gen_front():
 # ============================================================
 
 def gen_back():
-    w, h = EXT_X, SIDE_H
-    s = SVG(w, h, "04_back_panel.svg", margin=T_WALL + 3)
+    w = EXT_X - 2 * (MIN_OVERHANG + T_SIDE)
+    h = SIDE_H + T_WALL + T_SIDE  # extend T_WALL into top, T_SIDE into bottom
+    s = SVG(w, h, "04_back_panel.svg", margin=T_SIDE + 3)
     s.text(0, -3, f"BACK PANEL {w:.0f}x{h:.1f}mm (3mm)")
 
-    # tab on top/bottom = notches to receive top/bottom panel protrusions (T_WALL deep).
-    # outer_tab on left/right = tabs protruding outward into side panel through-slots (T_SIDE deep).
-    # skip_lr_ends: omit first/last tabs — no matching slots at side panel corners.
-    outline = finger_outline(w, h, top='tab', bottom='tab', left='outer_tab', right='outer_tab',
-                             depth=T_WALL, lr_depth=T_SIDE, skip_lr_ends=True)
+    # Custom outline: body width between slot inner edges, outer_tabs on L/R,
+    # top/bottom notches matching tb_panel protrusion pattern (EXT_X span).
+    outline = fb_panel_outline(h, top_depth=T_WALL, bot_depth=T_SIDE)
     s.path(outline)
 
     # No rod holes — vertical rods pass through top/bottom panels only
 
-    # Panel Y axis: Y=0 = top (Z=Z_TOP_PANEL), Y=SIDE_H = bottom (Z=0)
+    # Panel Y axis: Y=0 = top, Y=h = bottom.
+    # Panel extends T_SIDE above Z_TOP_PANEL and T_SIDE below T_SIDE.
     def z_to_y(z_enc):
-        return Z_TOP_PANEL - z_enc
+        return (Z_TOP_PANEL - z_enc) + T_SIDE
 
     # Pi5 is rotated: long edge (85mm) runs left-right, ports face left side panel.
     # Score line showing Pi5 PCB position (85mm wide, near left edge)
@@ -626,7 +913,7 @@ def gen_back():
 
 def gen_side(side='left'):
     # Side panel extends SIDE_OVERLAP past front and back panels
-    w = EXT_Y + 2 * SIDE_OVERLAP  # wider to wrap around front/back
+    w = INTERIOR_Y + 2 * SIDE_OVERLAP  # central INTERIOR_Y + wings to wrap around front/back
     h = SIDE_H
     idx = "05" if side == 'left' else "06"
     s = SVG(w, h, f"{idx}_{side}_side_panel.svg", margin=T_SIDE + 3)
@@ -637,11 +924,12 @@ def gen_side(side='left'):
     # Left/right edges are FLAT — interlocking with front/back is via through-slots in the face.
     def side_outline():
         pts = []
-        n_tb = max(3, round(EXT_Y / FINGER_WIDTH))
+        n_tb = max(3, round(INTERIOR_Y / FINGER_WIDTH))
         if n_tb % 2 == 0:
             n_tb += 1
-        fw = EXT_Y / n_tb
-        depth = T_WALL
+        fw = INTERIOR_Y / n_tb
+        top_depth = T_WALL   # tabs into 3mm top panel
+        bot_depth = T_SIDE   # tabs into 5mm bottom panel
 
         # Top edge: left to right, y=0
         # Left wing (flat)
@@ -653,14 +941,14 @@ def gen_side(side='left'):
             x1 = SIDE_OVERLAP + (i + 1) * fw
             if i % 2 == 0:  # tab — protrudes upward (negative y)
                 pts.append((x0, 0))
-                pts.append((x0, -depth))
-                pts.append((x1, -depth))
+                pts.append((x0, -top_depth))
+                pts.append((x1, -top_depth))
                 pts.append((x1, 0))
             else:
                 pts.append((x0, 0))
                 pts.append((x1, 0))
         # Right wing (flat)
-        pts.append((SIDE_OVERLAP + EXT_Y, 0))
+        pts.append((SIDE_OVERLAP + INTERIOR_Y, 0))
         pts.append((w, 0))
 
         # Right edge: top to bottom (flat)
@@ -670,15 +958,15 @@ def gen_side(side='left'):
         # Bottom edge: right to left, y=h
         # Right wing (flat)
         pts.append((w, h))
-        pts.append((SIDE_OVERLAP + EXT_Y, h))
+        pts.append((SIDE_OVERLAP + INTERIOR_Y, h))
         # Central tabs
         for i in range(n_tb - 1, -1, -1):
             x0 = SIDE_OVERLAP + i * fw
             x1 = SIDE_OVERLAP + (i + 1) * fw
             if i % 2 == 0:  # tab — protrudes downward (positive y)
                 pts.append((x1, h))
-                pts.append((x1, h + depth))
-                pts.append((x0, h + depth))
+                pts.append((x1, h + bot_depth))
+                pts.append((x0, h + bot_depth))
                 pts.append((x0, h))
             else:
                 pts.append((x1, h))
@@ -727,7 +1015,7 @@ def gen_side(side='left'):
                 slot_y = i * fw
                 s.rect(slot_x, slot_y, slot_w, fw)
 
-    # Side panel Y axis: Y=0 = top (Z=Z_TOP_PANEL), Y=SIDE_H = bottom (Z=0)
+    # Side panel Y axis: Y=0 = top (Z=Z_TOP_PANEL), Y=SIDE_H = bottom (Z=T_SIDE)
     # To convert enclosure Z to side panel Y: panel_y = Z_TOP_PANEL - enclosure_z
     def z_to_y(z_enc):
         return Z_TOP_PANEL - z_enc
@@ -735,9 +1023,9 @@ def gen_side(side='left'):
     # Pi5 port cutouts — only on left side panel (ports face left)
     if side == 'left':
         # Pi5 is centered front-to-back in enclosure.
-        # Bottom panel pi_oy = (EXT_Y + 2*T_WALL - PI5_W) / 2
-        # Interior Y of Pi5 front edge = pi_oy - T_WALL
-        pi_interior_y = (EXT_Y + 2 * T_WALL - PI5_W) / 2 - T_WALL
+        # Bottom panel pi_oy = (INTERIOR_Y - PI5_W) / 2 (h = INTERIOR_Y)
+        # pi_oy is already the interior offset (body = interior)
+        pi_interior_y = (INTERIOR_Y - PI5_W) / 2
         # Side panel X = SIDE_OVERLAP + interior_Y
         pi_x = SIDE_OVERLAP + pi_interior_y  # Pi5 start on side panel X axis
         pi_pcb_y = z_to_y(Z_PI5_PCB)  # PCB bottom in panel Y coords
