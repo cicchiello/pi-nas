@@ -1038,7 +1038,7 @@ def gen_side(side='left'):
             ("GbE",   1.25,   0.45, 17.9, 15.5),
             ("USB3", 21.30,   1.45, 15.6, 16.6),
             ("USB2", 39.10,   1.45, 15.8, 16.6),
-            ("HAT",  35.10,  22.05, 19.8,  6.1),
+            ("HAT",  34.60,  21.55, 20.8,  7.1),
         ]
         for name, px, pz, pw, ph in ports:
             cx = pi_x + px
@@ -1057,7 +1057,7 @@ def gen_side(side='left'):
     rail_front_y = T_WALL + SCREW_HEAD_CLR + T_BRACKET / 2
     rail_back_y = EXT_Y - T_WALL - SCREW_HEAD_CLR - T_BRACKET / 2
 
-    tab_slot_w = T_BRACKET + 0.3  # 5mm rail + clearance
+    tab_slot_w = T_BRACKET  # 5mm rail, snug fit
     tab_slot_h = 10.3  # matches tab_h=10 + clearance
     # Comb bar center Z in enclosure = COMB_BAR_Z + COMB_BAR_H/2
     bar_center_y = z_to_y(COMB_BAR_Z + COMB_BAR_H / 2)
@@ -1115,7 +1115,7 @@ def gen_comb_rail():
       X = across drives (enclosure X axis)
       Y = vertical: Y=0 is bar top, Y increases downward (teeth hang down)
     """
-    rail_w = INTERIOR_X  # full interior width
+    rail_w = EXT_X - 2 * (MIN_OVERHANG + T_SIDE)  # fit between side panel inner faces
     n_teeth = NUM_DRIVES  # 4 teeth, one per drive
     tooth_w = COMB_TOOTH_W  # 20mm wide
     tooth_len = COMB_TOOTH_LEN
@@ -1125,17 +1125,18 @@ def gen_comb_rail():
     # Tooth pitch: center-to-center distance between adjacent teeth/drives
     tooth_pitch = HDD_T + DRIVE_GAP  # 26.11 + 20 = 46.11mm
 
-    # Position teeth so outer drive faces are DRIVE_EDGE_MARGIN from side walls.
+    # Position teeth centered in rail. Edge margin derived from rail width.
+    edge_margin = (rail_w - DRIVE_GROUP_W) / 2  # ~7.28mm per side
     def tooth_x(i):
         """X position of tooth i (left edge) within the rail."""
-        drive_cx = DRIVE_EDGE_MARGIN + HDD_T / 2 + i * tooth_pitch
+        drive_cx = edge_margin + HDD_T / 2 + i * tooth_pitch
         return drive_cx - tooth_w / 2
 
     s = SVG(rail_w + 20, total_h + 20, "07_drive_comb_rail.svg")
     s.text(0, -3, f"DRIVE COMB RAIL (x2) {rail_w:.1f}x{total_h:.1f}mm (5mm acrylic)")
 
     # Tab dimensions — integrated into the outline path
-    tab_len = 8    # how far tab protrudes into side panel slot
+    tab_len = T_SIDE  # how far tab protrudes into side panel slot (match panel thickness)
     tab_h = 10     # tab height (vertical extent)
     tab_y0 = bar_h / 2 - tab_h / 2  # top of tab
     tab_y1 = tab_y0 + tab_h          # bottom of tab
@@ -1170,7 +1171,7 @@ def gen_comb_rail():
     s.path(pts)
 
     # Screw holes in each tooth — 3 holes per tooth, centered in tooth width
-    drive_y_bottom = total_h - 5  # 5mm above tooth tip for margin
+    drive_y_bottom = total_h - 2  # 2mm above tooth tip; keeps top hole ~2.8mm from bar top
 
     for i in range(n_teeth):
         tx = tooth_x(i)
