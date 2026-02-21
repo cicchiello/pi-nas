@@ -65,7 +65,7 @@ FAN_MOUNT_HOLE = 4.3
 NUM_DRIVES = 4
 DRIVE_GAP = 20.0       # 20mm face-to-face between adjacent drives for laminar airflow
 DRIVE_EDGE_MARGIN = 10.0  # 10mm from outer drive face to side wall
-CABLE_ZONE_H = 100.0   # 10cm for SATA cables
+CABLE_ZONE_H = 85.0    # reduced from 100mm; SATA cable zone between HAT and drives
 PI5_STANDOFF_H = 7.0   # M2.5 standoff under Pi5 (clears ~2mm bottom protrusion)
 PI5_ENVELOPE_H = 18.0  # Pi5 PCB bottom to top of tallest connector (RJ45, from STEP)
 PI5_TO_HAT_GAP = 3.0   # gap from Pi5 USB top to HAT PCB bottom (GPIO seated)
@@ -517,25 +517,24 @@ def gen_bottom():
     # Corner rod holes — vertical rods through top+bottom only
     add_rod_holes(s, w, h)
 
-    # Pi5 mounting holes — USB-A/RJ45 end near left side panel
-    # Pi5 long edge (85mm) runs along X (left-right),
-    # short edge (56mm) runs along Y (front-to-back).
-    # Port edge inset from left: side panel inner face (min_overhang + T_SIDE) + 2mm connector overhang.
-    pi_w_on_panel = PI5_L   # 85mm along X (left-right)
-    pi_h_on_panel = PI5_W   # 56mm along Y (front-to-back)
-    pi_ox = MIN_OVERHANG + T_SIDE + 2  # port edge: past side panel inner face + 2mm connector overhang
-    pi_oy = (h - pi_h_on_panel) / 2   # centered front-to-back
+    # Pi5 mounting holes — ports face front panel (Y=0)
+    # Pi5 long edge (85mm) runs along Y (front-to-back),
+    # short edge (56mm) runs along X (left-right), centered.
+    pi_w_on_panel = PI5_W   # 56mm along X (left-right)
+    pi_h_on_panel = PI5_L   # 85mm along Y (front-to-back)
+    pi_ox = (w - pi_w_on_panel) / 2   # centered left-to-right
+    pi_oy = 2                          # port edge near front panel inner face + 2mm clearance
     # Mounting holes: Pi5 native coords have origin at GPIO corner.
     # Native X runs along 85mm (long edge), native Y along 56mm (short edge).
-    # After rotation with USB/Eth end at left:
-    #   panel_x_offset = PI5_L - native_x  (long edge reversed: USB end X=85 -> panel X=0=left)
-    #   panel_y_offset = native_y  (short edge maps to panel Y)
+    # After rotation with USB/Eth end at front (Y=0):
+    #   panel_x = pi_ox + native_y  (short edge maps to panel X)
+    #   panel_y = pi_oy + (PI5_L - native_x)  (long edge reversed: USB end -> front)
     for nx, ny in [(PI5_HOLE_OFFSET_X, PI5_HOLE_OFFSET_Y),
                    (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y),
                    (PI5_HOLE_OFFSET_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y),
                    (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y)]:
-        hx = PI5_L - nx          # native X -> panel X (reversed)
-        hy = ny                  # native Y -> panel Y
+        hx = ny                  # native Y -> panel X
+        hy = PI5_L - nx          # native X -> panel Y (reversed)
         s.circle(pi_ox + hx, pi_oy + hy, PI5_HOLE_DIA / 2)
 
     # Dense ventilation grid across entire bottom panel for bottom-to-top airflow.
@@ -564,17 +563,18 @@ def gen_bottom():
                    (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y),
                    (PI5_HOLE_OFFSET_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y),
                    (PI5_HOLE_OFFSET_X + PI5_HOLE_SPACING_X, PI5_HOLE_OFFSET_Y + PI5_HOLE_SPACING_Y)]:
-        hx = pi_ox + PI5_L - nx
-        hy = pi_oy + ny
+        hx = pi_ox + ny               # native Y -> panel X
+        hy = pi_oy + PI5_L - nx       # native X -> panel Y (reversed)
         pi_holes.append((hx, hy))
 
-    # SD card access hole dimensions (computed early for exclusion zone)
-    sd_slot_y0 = 22.05   # offset from pi_oy along 56mm edge
-    sd_slot_y1 = 34.0
-    sd_w = 20.0     # extends past PCB edge for finger reach
-    sd_h = 14.0     # slightly wider than 12mm slot for finger access
-    sd_x = pi_ox + pi_w_on_panel - sd_w / 4   # skewed past right edge for finger access
-    sd_y = pi_oy + sd_slot_y0 + (sd_slot_y1 - sd_slot_y0 - sd_h) / 2  # centered on slot
+    # SD card access hole — SD card is on native X- side, which maps to back (high Y).
+    # SD card slot runs along native Y (56mm edge), which maps to panel X.
+    sd_slot_x0 = 22.05   # offset along native Y (56mm edge) from GPIO corner
+    sd_slot_x1 = 34.0
+    sd_w = 14.0     # along panel X (was along native Y)
+    sd_h = 20.0     # along panel Y, extends past PCB edge for finger reach
+    sd_x = pi_ox + sd_slot_x0 + (sd_slot_x1 - sd_slot_x0 - sd_w) / 2  # centered on slot
+    sd_y = pi_oy + pi_h_on_panel - sd_h / 4   # skewed past back edge for finger access
 
     def overlaps_exclusion(vx, vy):
         for hx, hy in pi_holes:
@@ -599,7 +599,7 @@ def gen_bottom():
 
     # Score: Pi5 outline (rotated)
     s.rect(pi_ox, pi_oy, pi_w_on_panel, pi_h_on_panel, style="engrave")
-    s.text(pi_ox + 2, pi_oy + 10, "Pi5 (USB-A/RJ45 end at left)", size=3)
+    s.text(pi_ox + 2, pi_oy + 10, "Pi5 (ports at front)", size=3)
 
     s.save()
 
@@ -840,7 +840,36 @@ def gen_front():
     def z_to_y(z_enc):
         return (Z_TOP_PANEL - z_enc) + T_SIDE
 
-    # Pi5 port cutouts and DC barrel jack moved to left side panel (Pi5 rotated: ports face left)
+    # Pi5 port cutouts — ports face front panel.
+    # Pi5 is centered left-to-right in enclosure.
+    # Front panel X axis maps to enclosure X axis (offset by body edge).
+    # Front panel body_w = EXT_X - 2*(MIN_OVERHANG + T_SIDE) = 179mm.
+    # Pi5 center on enclosure X = EXT_X/2. On front panel X = body_w/2.
+    body_w = w  # = EXT_X - 2*(MIN_OVERHANG + T_SIDE)
+    pi_panel_x = (body_w - PI5_W) / 2  # Pi5 short edge (56mm) centered on panel
+    pi_pcb_y = z_to_y(Z_PI5_PCB)  # PCB bottom in panel Y coords
+
+    # Port positions along the 56mm short edge (from STEP model).
+    # (name, x_offset_from_pi_left, z_offset_from_pcb_bottom, width, height)
+    # Facing the front panel from outside, the Pi5 short edge runs left-right.
+    # native_Y=0 is at pi_panel_x, native_Y=56 at pi_panel_x + PI5_W.
+    ports = [
+        ("GbE",   1.25,   0.45, 17.9, 16.5),
+        ("USB3", 21.30,   1.45, 15.6, 17.6),
+        ("USB2", 39.10,   1.45, 15.8, 17.6),
+        ("HAT",  34.60,  21.55, 20.8,  8.1),
+    ]
+    for name, px, pz, pw, ph in ports:
+        cx = pi_panel_x + px
+        cy = pi_pcb_y - pz - ph - 1  # +1mm upward for better fit
+        s.rrect(cx, cy, pw, ph, r=1.5)
+        s.text(cx, cy - 1.5, name, size=2)
+
+    # DC barrel jack — 8mm hole, 17mm to the left of Pi5 ports
+    dc_x = pi_panel_x - 17  # 17mm left of Pi5 left edge
+    dc_y = z_to_y(T_SIDE + 15)  # 15mm above bottom panel top
+    s.circle(dc_x, dc_y, 4.0)
+    s.text(dc_x + 6, dc_y + 1, "DC 12V", size=2)
 
     # Score line showing drive zone start
     dz_y = z_to_y(Z_DRIVE_BOT)
@@ -893,12 +922,13 @@ def gen_back():
     def z_to_y(z_enc):
         return (Z_TOP_PANEL - z_enc) + T_SIDE
 
-    # Pi5 is rotated: long edge (85mm) runs left-right, ports face left side panel.
-    # Score line showing Pi5 PCB position (85mm wide, near left edge)
-    pi_x = T_SIDE  # Pi5 port edge near left side panel interior
+    # Pi5 is rotated: long edge (85mm) runs front-to-back, ports face front panel.
+    # Score line showing Pi5 PCB position (56mm wide, centered left-right)
+    body_w = w  # back panel body width
+    pi_x = (body_w - PI5_W) / 2  # centered left-right
     pi_z_y = z_to_y(Z_PI5_PCB + 1.45)  # top of PCB (1.45mm thick from STEP)
-    s.rect(pi_x, pi_z_y, PI5_L, 1.45, style="engrave")
-    s.text(pi_x, pi_z_y - 1.5, "Pi5 (ports on left side)", size=2)
+    s.rect(pi_x, pi_z_y, PI5_W, 1.45, style="engrave")
+    s.text(pi_x, pi_z_y - 1.5, "Pi5 (ports at front)", size=2)
 
     # DC barrel jack — moved to front panel
 
@@ -1020,37 +1050,8 @@ def gen_side(side='left'):
     def z_to_y(z_enc):
         return Z_TOP_PANEL - z_enc
 
-    # Pi5 port cutouts — only on left side panel (ports face left)
-    if side == 'left':
-        # Pi5 is centered front-to-back in enclosure.
-        # Bottom panel pi_oy = (INTERIOR_Y - PI5_W) / 2 (h = INTERIOR_Y)
-        # pi_oy is already the interior offset (body = interior)
-        pi_interior_y = (INTERIOR_Y - PI5_W) / 2
-        # Side panel X = SIDE_OVERLAP + interior_Y
-        pi_x = SIDE_OVERLAP + pi_interior_y  # Pi5 start on side panel X axis
-        pi_pcb_y = z_to_y(Z_PI5_PCB)  # PCB bottom in panel Y coords
-
-        # Port positions along the 56mm short edge (from STEP model).
-        # (name, x_offset_from_pi_left, z_offset_from_pcb_bottom, width, height)
-        # Facing the left side panel from outside, left = front, right = back.
-        # native_Y=0 (GbE end) is at pi_x, native_Y=56 at pi_x + PI5_W.
-        ports = [
-            ("GbE",   1.25,   0.45, 17.9, 15.5),
-            ("USB3", 21.30,   1.45, 15.6, 16.6),
-            ("USB2", 39.10,   1.45, 15.8, 16.6),
-            ("HAT",  34.60,  21.55, 20.8,  7.1),
-        ]
-        for name, px, pz, pw, ph in ports:
-            cx = pi_x + px
-            cy = pi_pcb_y - pz - ph
-            s.rrect(cx, cy, pw, ph, r=1.5)
-            s.text(cx, cy - 1.5, name, size=2)
-
-        # DC barrel jack — 8mm hole, positioned 15mm toward front from Pi5 ports
-        dc_x = pi_x - 15
-        dc_y = z_to_y(T_SIDE + 15)  # 15mm above bottom panel top (5mm)
-        s.circle(dc_x, dc_y, 4.0)
-        s.text(dc_x + 6, dc_y + 1, "DC 12V", size=2)
+    # Pi5 port cutouts are on the front panel (ports face front).
+    # No port cutouts on side panels.
 
     # Comb rail mounting slots — two rails (front + back of drives)
     # X on side panel = SIDE_OVERLAP + (enclosure Y position - T_WALL)
@@ -1171,7 +1172,7 @@ def gen_comb_rail():
     s.path(pts)
 
     # Screw holes in each tooth — 3 holes per tooth, centered in tooth width
-    drive_y_bottom = total_h - 2  # 2mm above tooth tip; keeps top hole ~2.8mm from bar top
+    drive_y_bottom = total_h - 2 + 11  # shifted 11mm toward tooth tips (drives drop in enclosure)
 
     for i in range(n_teeth):
         tx = tooth_x(i)
@@ -1198,7 +1199,7 @@ def gen_comb_rail():
 # ============================================================
 
 def gen_fan_bracket():
-    bw = INTERIOR_X - 2
+    bw = EXT_X - 2 * (MIN_OVERHANG + T_SIDE) - 2  # fit between side panel inner faces with 2mm clearance
     bh = INTERIOR_Y - 2
     s = SVG(bw + 10, bh + 10, "09_fan_bracket.svg")
     s.text(0, -3, f"FAN BRACKET {bw:.0f}x{bh:.0f}mm (3mm acrylic)")

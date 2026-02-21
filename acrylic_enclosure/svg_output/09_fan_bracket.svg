@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="203mm" height="138mm" viewBox="0 0 203 138">
+<svg xmlns="http://www.w3.org/2000/svg" width="197mm" height="138mm" viewBox="0 0 197 138">
 <!-- Red=cut, Blue=score/engrave. All dims in mm. -->
-  <text x="5" y="2" font-size="3" fill="#999" font-family="monospace">FAN BRACKET 183x118mm (3mm acrylic)</text>
-  <rect x="5" y="5" width="183" height="118" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <text x="5" y="2" font-size="3" fill="#999" font-family="monospace">FAN BRACKET 177x118mm (3mm acrylic)</text>
+  <rect x="5" y="5" width="177" height="118" fill="none" stroke="#ff0000" stroke-width="0.1"/>
   <circle cx="17" cy="17" r="2.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <circle cx="176" cy="17" r="2.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <circle cx="170" cy="17" r="2.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
   <circle cx="17" cy="111" r="2.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <circle cx="176" cy="111" r="2.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <circle cx="96.5" cy="64" r="37" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <circle cx="60.75" cy="28.25" r="2.15" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <circle cx="132.25" cy="28.25" r="2.15" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <circle cx="60.75" cy="99.75" r="2.15" fill="none" stroke="#ff0000" stroke-width="0.1"/>
-  <circle cx="132.25" cy="99.75" r="2.15" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <circle cx="170" cy="111" r="2.25" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <circle cx="93.5" cy="64" r="37" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <circle cx="57.75" cy="28.25" r="2.15" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <circle cx="129.25" cy="28.25" r="2.15" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <circle cx="57.75" cy="99.75" r="2.15" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <circle cx="129.25" cy="99.75" r="2.15" fill="none" stroke="#ff0000" stroke-width="0.1"/>
 </svg>
