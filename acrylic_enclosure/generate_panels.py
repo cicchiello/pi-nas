@@ -63,10 +63,10 @@ FAN_MOUNT_HOLE = 4.3
 
 # Layout
 NUM_DRIVES = 4
-DRIVE_GAP = 20.0       # 20mm face-to-face between adjacent drives for laminar airflow
-DRIVE_EDGE_MARGIN = 10.0  # 10mm from outer drive face to side wall
-CABLE_ZONE_H = 85.0    # reduced from 100mm; SATA cable zone between HAT and drives
-PI5_STANDOFF_H = 7.0   # M2.5 standoff under Pi5 (clears ~2mm bottom protrusion)
+DRIVE_GAP = 19.0       # 19mm face-to-face between adjacent drives for laminar airflow
+DRIVE_EDGE_MARGIN = 11.5  # 11.5mm from outer drive face to side wall
+CABLE_ZONE_H = 82.0    # 85-3mm; absorbs 3mm from taller Pi5 standoff
+PI5_STANDOFF_H = 10.0  # M2.5 standoff under Pi5 (10mm for off-the-shelf availability)
 PI5_ENVELOPE_H = 18.0  # Pi5 PCB bottom to top of tallest connector (RJ45, from STEP)
 PI5_TO_HAT_GAP = 3.0   # gap from Pi5 USB top to HAT PCB bottom (GPIO seated)
 HAT_ENVELOPE_H = 12.25 # HAT PCB bottom to top of tallest connector (from STEP)
@@ -871,10 +871,7 @@ def gen_front():
     s.circle(dc_x, dc_y, 4.0)
     s.text(dc_x + 6, dc_y + 1, "DC 12V", size=2)
 
-    # Score line showing drive zone start
-    dz_y = z_to_y(Z_DRIVE_BOT)
-    s.rect(10, dz_y - 0.15, w - 20, 0.3, style="engrave")
-    s.text(2, dz_y + 3, f"drive zone", size=2)
+    # (drive zone score line removed — not needed for production)
 
     # Ventilation: cable zone
     vx_start, vx_end = 20, w - 20
@@ -922,17 +919,100 @@ def gen_back():
     def z_to_y(z_enc):
         return (Z_TOP_PANEL - z_enc) + T_SIDE
 
-    # Pi5 is rotated: long edge (85mm) runs front-to-back, ports face front panel.
-    # Score line showing Pi5 PCB position (56mm wide, centered left-right)
     body_w = w  # back panel body width
-    pi_x = (body_w - PI5_W) / 2  # centered left-right
-    pi_z_y = z_to_y(Z_PI5_PCB + 1.45)  # top of PCB (1.45mm thick from STEP)
-    s.rect(pi_x, pi_z_y, PI5_W, 1.45, style="engrave")
-    s.text(pi_x, pi_z_y - 1.5, "Pi5 (ports at front)", size=2)
 
-    # DC barrel jack — moved to front panel
+    # ---- "pi-nas" italic logo, engraved, centered at ~1/4 from top ----
+    # Each glyph defined as a list of strokes in a 1.0×1.0 unit cell.
+    # Italic slant applied via shear: x' = x + slant * (1 - y)
+    SLANT = 0.18  # italic shear factor
 
-    # Ventilation slots moved to front panel
+    # All lowercase glyphs: x-height region 0.25–0.75, descenders go below 0.75.
+    # Each glyph is a list of strokes in a 1.0×1.0 unit cell.
+    glyphs = {
+        'p': [  # stem with descender + bowl
+            [(0.25, 0.25), (0.10, 0.95)],          # stem (x-height to descender)
+            [(0.25, 0.25), (0.55, 0.25)],           # top bar
+            [(0.55, 0.25), (0.78, 0.30)],           # top-right curve
+            [(0.78, 0.30), (0.82, 0.42)],           # right side upper
+            [(0.82, 0.42), (0.78, 0.55)],           # right side lower
+            [(0.78, 0.55), (0.55, 0.60)],           # bottom-right curve
+            [(0.55, 0.60), (0.20, 0.60)],           # bottom bar back to stem
+        ],
+        'i': [  # vertical stroke + dot
+            [(0.35, 0.25), (0.25, 0.75)],           # stem
+            [(0.42, 0.08), (0.40, 0.15)],           # dot
+        ],
+        '-': [  # horizontal dash
+            [(0.15, 0.45), (0.75, 0.45)],           # dash
+        ],
+        'n': [  # two verticals + arch
+            [(0.25, 0.25), (0.15, 0.75)],           # left stem
+            [(0.25, 0.40), (0.45, 0.25)],           # arch up
+            [(0.45, 0.25), (0.65, 0.25)],           # arch top
+            [(0.65, 0.25), (0.75, 0.40)],           # arch down
+            [(0.75, 0.40), (0.65, 0.75)],           # right stem
+        ],
+        'a': [  # bowl + stem
+            [(0.70, 0.25), (0.50, 0.25)],           # top bar
+            [(0.50, 0.25), (0.25, 0.35)],           # left curve top
+            [(0.25, 0.35), (0.20, 0.50)],           # left side
+            [(0.20, 0.50), (0.25, 0.65)],           # left curve bottom
+            [(0.25, 0.65), (0.50, 0.75)],           # bottom curve
+            [(0.50, 0.75), (0.65, 0.70)],           # bottom right
+            [(0.78, 0.25), (0.62, 0.75)],           # right stem
+        ],
+        's': [  # s-curve
+            [(0.75, 0.30), (0.55, 0.25)],           # top-right to top
+            [(0.55, 0.25), (0.30, 0.28)],           # top to top-left
+            [(0.30, 0.28), (0.22, 0.38)],           # top-left curve
+            [(0.22, 0.38), (0.35, 0.48)],           # to middle
+            [(0.35, 0.48), (0.60, 0.55)],           # middle cross
+            [(0.60, 0.55), (0.68, 0.65)],           # bottom-right curve
+            [(0.68, 0.65), (0.55, 0.75)],           # to bottom
+            [(0.55, 0.75), (0.30, 0.72)],           # bottom to bottom-left
+            [(0.30, 0.72), (0.15, 0.65)],           # bottom-left
+        ],
+    }
+
+    logo_text = "pi-nas"
+    char_h = 30.0       # glyph cell height in mm
+    char_w = 18.0       # glyph cell width in mm
+    char_gap = 3.0      # gap between glyphs
+    logo_w = len(logo_text) * char_w + (len(logo_text) - 1) * char_gap
+    logo_x0 = (body_w - logo_w) / 2
+    logo_y0 = h * 0.25 - char_h / 2   # centered at 1/4 from top
+
+    # Bold weight: draw each stroke 3 times with small perpendicular offsets
+    BOLD_OFFSETS = [-0.6, 0.0, 0.6]  # mm offset from center line
+
+    for ci, ch in enumerate(logo_text):
+        if ch not in glyphs:
+            continue
+        cx = logo_x0 + ci * (char_w + char_gap)
+        cy = logo_y0
+        for stroke in glyphs[ch]:
+            # Compute the base points (with italic shear)
+            base_pts = []
+            for ux, uy in stroke:
+                sx = ux * char_w + SLANT * (1.0 - uy) * char_h
+                sy = uy * char_h
+                base_pts.append((cx + sx, cy + sy))
+            # For each bold offset, shift perpendicular to the overall stroke direction
+            if len(base_pts) >= 2:
+                dx = base_pts[-1][0] - base_pts[0][0]
+                dy = base_pts[-1][1] - base_pts[0][1]
+                length = math.hypot(dx, dy)
+                if length > 0:
+                    # Perpendicular unit vector
+                    nx = -dy / length
+                    ny = dx / length
+                else:
+                    nx, ny = 0, 0
+            else:
+                nx, ny = 0, 0
+            for off in BOLD_OFFSETS:
+                pts = [(px + nx * off, py + ny * off) for px, py in base_pts]
+                s.path(pts, closed=False, style="engrave")
 
     s.save()
 
@@ -1124,14 +1204,14 @@ def gen_comb_rail():
     total_h = COMB_TOTAL_H
 
     # Tooth pitch: center-to-center distance between adjacent teeth/drives
-    tooth_pitch = HDD_T + DRIVE_GAP  # 26.11 + 20 = 46.11mm
+    tooth_pitch = HDD_T + DRIVE_GAP  # 26.11 + 19 = 45.11mm
 
     # Position teeth centered in rail. Edge margin derived from rail width.
     edge_margin = (rail_w - DRIVE_GROUP_W) / 2  # ~7.28mm per side
     def tooth_x(i):
         """X position of tooth i (left edge) within the rail."""
         drive_cx = edge_margin + HDD_T / 2 + i * tooth_pitch
-        return drive_cx - tooth_w / 2
+        return drive_cx - tooth_w / 2 - 7  # shifted 7mm left (asymmetric rail)
 
     s = SVG(rail_w + 20, total_h + 20, "07_drive_comb_rail.svg")
     s.text(0, -3, f"DRIVE COMB RAIL (x2) {rail_w:.1f}x{total_h:.1f}mm (5mm acrylic)")
@@ -1176,7 +1256,7 @@ def gen_comb_rail():
 
     for i in range(n_teeth):
         tx = tooth_x(i)
-        tooth_cx = tx + tooth_w / 2
+        tooth_cx = tx + tooth_w / 2  # centered in tooth
 
         for hz in HDD_SIDE_HOLE_Z:
             hy = drive_y_bottom - hz
@@ -1202,14 +1282,24 @@ def gen_fan_bracket():
     bw = EXT_X - 2 * (MIN_OVERHANG + T_SIDE) - 2  # fit between side panel inner faces with 2mm clearance
     bh = INTERIOR_Y - 2
     s = SVG(bw + 10, bh + 10, "09_fan_bracket.svg")
-    s.text(0, -3, f"FAN BRACKET {bw:.0f}x{bh:.0f}mm (3mm acrylic)")
+    s.text(0, -3, f"FAN BRACKET {bw:.0f}x{bh:.0f}mm (5mm acrylic)")
 
     s.rect(0, 0, bw, bh)
 
-    # Rod holes — vertical rods pass through this bracket
-    ri = ROD_INSET - 1  # slightly less inset since bracket is 2mm smaller than interior
-    for rcx, rcy in [(ri, ri), (bw - ri, ri), (ri, bh - ri), (bw - ri, bh - ri)]:
-        s.circle(rcx, rcy, ROD_HOLE / 2)
+    # Rod holes — must align with top/bottom panel rod holes.
+    # Top/bottom panels: holes at ROD_INSET from panel edges (EXT_X × INTERIOR_Y).
+    # Bracket origin in enclosure coords: X = MIN_OVERHANG + T_SIDE + 1, Y = 1.
+    bracket_ox = MIN_OVERHANG + T_SIDE + 1  # bracket left edge in enclosure X
+    bracket_oy = 1                           # bracket front edge in enclosure Y
+    # Top/bottom panel rod positions in enclosure coords
+    rod_positions = [(ROD_INSET, ROD_INSET),
+                     (EXT_X - ROD_INSET, ROD_INSET),
+                     (ROD_INSET, INTERIOR_Y - ROD_INSET),
+                     (EXT_X - ROD_INSET, INTERIOR_Y - ROD_INSET)]
+    for rx, ry in rod_positions:
+        bx = rx - bracket_ox
+        by = ry - bracket_oy
+        s.circle(bx, by, ROD_HOLE / 2)
 
     # Fan opening
     cx, cy = bw / 2, bh / 2
