@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="209mm" height="166.99mm" viewBox="0 0 209 166.99">
 <!-- Red=cut, Blue=score/engrave. All dims in mm. -->
   <text x="5" y="2" font-size="3" fill="#999" font-family="monospace">DRIVE COMB RAIL (x2) 179.0x137.0mm (5mm acrylic)</text>
-  <path d="M 5,5 L 184,5 L 184,6 L 189,6 L 189,16 L 184,16 L 184,17 L 165.165,17 L 165.165,141.99 L 145.165,141.99 L 145.165,17 L 120.055,17 L 120.055,141.99 L 100.055,141.99 L 100.055,17 L 74.945,17 L 74.945,141.99 L 54.945,141.99 L 54.945,17 L 29.835,17 L 29.835,141.99 L 9.835,141.99 L 9.835,17 L 5,17 L 5,16 L 0,16 L 0,6 L 5,6 Z" fill="none" stroke="#ff0000" stroke-width="0.1"/>
+  <path d="M 5,5 L 184,5 L 184,6 L 188.5,6 L 188.5,16 L 184,16 L 184,17 L 165.165,17 L 165.165,141.99 L 145.165,141.99 L 145.165,17 L 120.055,17 L 120.055,141.99 L 100.055,141.99 L 100.055,17 L 74.945,17 L 74.945,141.99 L 54.945,141.99 L 54.945,17 L 29.835,17 L 29.835,141.99 L 9.835,141.99 L 9.835,17 L 5,17 L 5,16 L 0.5,16 L 0.5,6 L 5,6 Z" fill="none" stroke="#ff0000" stroke-width="0.1"/>
   <circle cx="19.835" cy="122.49" r="1.7" fill="none" stroke="#ff0000" stroke-width="0.1"/>
   <circle cx="19.835" cy="122.49" r="3.5" fill="none" stroke="#0000ff" stroke-width="0.1"/>
   <circle cx="19.835" cy="80.49" r="1.7" fill="none" stroke="#ff0000" stroke-width="0.1"/>

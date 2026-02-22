@@ -24,8 +24,8 @@ import os
 # ============================================================
 
 T_WALL = 3.0        # front/back/top panel acrylic thickness
-T_SIDE = 5.0        # left/right side and bottom panel acrylic thickness
-T_BRACKET = 5.0     # drive bracket / comb rail acrylic thickness
+T_SIDE = 4.5        # left/right side and bottom panel acrylic thickness
+T_BRACKET = 4.5     # drive bracket / comb rail acrylic thickness
 KERF = 0.1          # laser kerf half-width
 
 # Corner threaded rods (M4) — vertical only, through top+bottom panels
