@@ -1,0 +1,15 @@
+[Unit]
+Description=NAS fan control loop
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/nas_fan_control.py
+Restart=always
+RestartSec=5
+User=root
+WorkingDirectory=/usr/local/bin
+
+[Install]
+WantedBy=multi-user.target
