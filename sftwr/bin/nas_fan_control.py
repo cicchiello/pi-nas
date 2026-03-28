@@ -21,12 +21,12 @@ FULL_SPEED_DUTY_NS = 0      # fastest
 POLL_SEC = 10
 
 # ===== temperature thresholds =====
-STOP_BELOW_C = 40.0         # if control temp <= this, stop fan
-RESTART_ABOVE_C = 43.0      # if stopped, don't restart until above this
+STOP_BELOW_C = 37.0         # if control temp <= this, stop fan
+RESTART_ABOVE_C = 40.0      # if stopped, don't restart until above this
 
 # Linear ramp endpoints once fan is running
-RAMP_START_C = 40.0         # start fan at MIN_RUN_DUTY_NS
-RAMP_FULL_C = 60.0          # reach FULL_SPEED_DUTY_NS here
+RAMP_START_C = 37.0         # start fan at MIN_RUN_DUTY_NS
+RAMP_FULL_C = 50.0          # reach FULL_SPEED_DUTY_NS here
 
 # ===== control smoothing =====
 MAX_DUTY_STEP_NS = 4000     # limit per-loop duty change to reduce sudden jumps
